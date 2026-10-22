@@ -21,12 +21,15 @@ export interface OcrWord {
   text: string;
   /** 0–100 as reported by Tesseract. */
   confidence: number;
+  /** Pixel box in the processed image (used to outline low-confidence words). */
+  bbox?: { x0: number; y0: number; x1: number; y1: number };
 }
 
 export interface OcrLine {
   text: string;
   confidence: number;
   words: OcrWord[];
+  bbox?: { x0: number; y0: number; x1: number; y1: number };
 }
 
 export interface FieldConfidence {
@@ -42,6 +45,8 @@ export interface ParsedItem {
   totalPaise: Paise;
   confidence: FieldConfidence;
   raw: string;
+  /** Index of the OCR line this came from (lets the UI point at it on the image). */
+  line: number;
 }
 
 export interface ParsedAdjustment {
@@ -50,6 +55,7 @@ export interface ParsedAdjustment {
   amountPaise: Paise;
   confidence: number;
   raw: string;
+  line: number;
 }
 
 export interface ParsedReceipt {
@@ -115,9 +121,9 @@ export function normaliseNumberToken(raw: string): string {
 
 function parseAmountToken(tok: string): Paise | null {
   if (!NUMERIC_LIKE.test(tok)) return null;
-  const digits = tok.replace(/[^\d]/g, '').length;
-  const letters = tok.replace(/[^A-Za-z]/g, '').replace(/^(rs|inr)/i, '').length;
-  if (letters > digits) return null;
+  // Only letters that OCR commonly confuses with digits (O, l, I, S, B) may appear.
+  const letters = tok.replace(/^\(?-?(rs\.?|inr)/i, '').replace(/[^A-Za-z]/g, '');
+  if (/[^OoSlIB]/.test(letters)) return null;
   const value = parseMoney(normaliseNumberToken(tok));
   if (value === null) return null;
   return value;
@@ -214,7 +220,7 @@ function classify(label: string): { kind: Kind; strength?: number } {
 }
 
 /** Recover qty / unit / total from the trailing numbers and the label. */
-function itemFromLine(label: Token[], amounts: SplitLine['amounts']): Omit<ParsedItem, 'raw' | 'name'> & { nameTokens: Token[] } | null {
+function itemFromLine(label: Token[], amounts: SplitLine['amounts']): Omit<ParsedItem, 'raw' | 'name' | 'line'> & { nameTokens: Token[] } | null {
   let nameTokens = [...label];
   const hasQtyColumn = amounts.length >= 2;
   const last = amounts[amounts.length - 1];
@@ -301,9 +307,9 @@ export function parseReceipt(lines: readonly OcrLine[]): ParsedReceipt {
   type Candidate = { index: number; amount: Paise; strength: number; confidence: number };
   const totals: Candidate[] = [];
   const subtotals: Candidate[] = [];
-  const adjustments: (ParsedAdjustment & { index: number })[] = [];
-  const items: (ParsedItem & { index: number })[] = [];
-  const taxSummaries: (ParsedAdjustment & { index: number })[] = [];
+  const adjustments: (Omit<ParsedAdjustment, 'line'> & { index: number })[] = [];
+  const items: (Omit<ParsedItem, 'line'> & { index: number })[] = [];
+  const taxSummaries: (Omit<ParsedAdjustment, 'line'> & { index: number })[] = [];
   let summaryStarted = -1;
 
   lines.forEach((line, index) => {
@@ -355,7 +361,9 @@ export function parseReceipt(lines: readonly OcrLine[]): ParsedReceipt {
         return;
       }
       const name = cleanName(parsed.nameTokens);
-      if (name.replace(/[^A-Za-z]/g, '').length < 2) {
+      const avgConf = (parsed.confidence.name + parsed.confidence.price) / 2;
+      // Reject gibberish (no vowels, e.g. OCR of a photo that is not a receipt) and near-zero confidence.
+      if (name.replace(/[^A-Za-z]/g, '').length < 2 || !/[aeiouy]/i.test(name) || avgConf < 30) {
         result.ignored.push(text);
         return;
       }
@@ -403,11 +411,11 @@ export function parseReceipt(lines: readonly OcrLine[]): ParsedReceipt {
     }
   }
 
-  result.items = items.filter((i) => i.index < totalIndex).map(({ index: _i, ...rest }) => (void _i, rest));
+  result.items = items.filter((i) => i.index < totalIndex).map(({ index, ...rest }) => ({ ...rest, line: index }));
   result.adjustments = adjustments
     .filter((a) => a.index < totalIndex)
     .sort((a, b) => a.index - b.index)
-    .map(({ index: _i, ...rest }) => (void _i, rest));
+    .map(({ index, ...rest }) => ({ ...rest, line: index }));
   const sub = subtotals.sort((a, b) => b.index - a.index)[0];
   if (sub) result.subtotalPaise = sub.amount;
   return result;

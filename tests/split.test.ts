@@ -11,7 +11,7 @@ const item = (name: string, totalPaise: number, assignees: string[]): ReceiptIte
   category: 'Food',
   assignees,
 });
-const adj = (kind: Adjustment['kind'], amountPaise: number, label = kind): Adjustment => ({ id: label, label, kind, amountPaise });
+const adj = (kind: Adjustment["kind"], amountPaise: number, label: string = kind): Adjustment => ({ id: label, label, kind, amountPaise });
 
 describe('allocate (largest remainder)', () => {
   it('₹100 three ways reconciles exactly: 33.34 / 33.33 / 33.33', () => {
