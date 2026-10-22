@@ -11,6 +11,14 @@ test('manual expense paid by two people settles against both', async ({ page }) 
   await page.getByLabel('Amount Riya paid').fill('500');
   await page.getByRole('button', { name: '+ rest' }).first().click(); // Arjun pays the remaining ₹400
   await expect(page.getByText('₹900.00 of ₹900.00 entered')).toBeVisible();
+  await expect(page.locator('.multi-payer-status')).toContainText('2 people paid');
+
+  // Switching back to one payer picks whoever paid the most, and can be undone.
+  await page.getByRole('button', { name: 'Switch to a single payer' }).click();
+  await expect(page.getByRole('radio', { name: /Riya/ })).toHaveAttribute('aria-checked', 'true');
+  await page.getByRole('button', { name: /Several people paid/ }).click();
+  await page.getByLabel('Amount Riya paid').fill('500');
+  await page.getByRole('button', { name: '+ rest' }).first().click();
   await page.locator('form').getByRole('button', { name: 'Add expense' }).click();
 
   await expect(page.locator('.list-row').first()).toContainText('You and Arjun paid');
