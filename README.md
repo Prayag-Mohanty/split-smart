@@ -85,7 +85,7 @@ No training or fine-tuning, no paid APIs, no API keys. Receipt images never leav
 - **WhatsApp-ready bill card:** one tap draws an image of the split, with each person's share and a UPI QR to pay the payer, and opens the phone's share sheet (or downloads it).
 - **Drag items onto faces:** in Assign, drag an item by its handle onto a person in the dock; the running totals count up. Tap-to-toggle remains for accessibility.
 - **Consequence line:** the Split screen shows "For this bill: Arjun → You ₹168 · …" and how many payments the whole group needs after saving.
-- **Polish:** first-run hero with the demo as the main action, a status strip ("You get back ₹212 · 3 payments pending → View"), a desktop two-column layout with live balances, step transitions, a sticky photo strip with tap-to-zoom on phones, amber for money you owe, a "?" badge on low-confidence fields, and confetti plus a short vibration when everyone is settled.
+- **Polish:** first-run hero with the demo as the main action, a status strip ("You get back ₹212 · 3 payments pending → View"), a desktop two-column layout with live balances, step transitions, a compact photo strip with tap-to-zoom on phones, amber for money you owe, a "?" badge on low-confidence fields, and confetti plus a short vibration when everyone is settled.
 
 ---
 

@@ -2621,11 +2621,6 @@ a.group-strip:hover {
   width: 100%;
 }
 @media (max-width: 959px) {
-  .review-image.is-strip {
-    position: sticky;
-    top: calc(var(--appbar-h) + env(safe-area-inset-top) + 46px);
-    z-index: 6;
-  }
   .review-image.is-strip .card {
     padding: 8px 10px;
   }

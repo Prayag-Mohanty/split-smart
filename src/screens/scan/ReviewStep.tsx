@@ -28,7 +28,8 @@ const KIND_LABEL: Record<AdjustmentKind, string> = { tax: 'Tax / GST', service: 
 
 export function ReviewStep({ draft, update, image, categorizing, canRescan, onRotate, onRetake, onManualFallback, onNext }: ReviewStepProps) {
   const [activeLine, setActiveLine] = useState<number | undefined>();
-  // Phones start with a compact, sticky strip so the fields to fix come first; desktop shows the photo beside the table.
+  // Phones start with a compact strip (in the page flow, not floating) so the fields to fix come first;
+  // desktop shows the photo beside the table.
   const [showImage, setShowImage] = useState(() => window.matchMedia?.('(min-width: 960px)').matches ?? true);
   const [zoomed, setZoomed] = useState(false);
   const [zoom, setZoom] = useState<1 | 2>(1);
