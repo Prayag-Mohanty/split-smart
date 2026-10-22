@@ -150,7 +150,7 @@ function Flow({ group, editing }: { group: Group; editing?: Extract<Group['expen
           const parsed = parseReceipt(result.lines);
           const score = parsed.items.length * 10 + (parsed.totalPaise !== undefined ? 15 : 0) + result.meanConfidence / 10;
           if (!best || score > best.score) best = { rot: r, canvas, result, parsed, score };
-          if (parsed.items.length > 0 && result.meanConfidence >= 60) break;
+          if (parsed.items.length >= 2 || (parsed.items.length > 0 && result.meanConfidence >= 50)) break;
         }
         if (!best) return;
         const { result, parsed } = best;

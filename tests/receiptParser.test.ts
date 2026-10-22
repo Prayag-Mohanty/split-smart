@@ -115,4 +115,34 @@ describe('parseReceipt', () => {
     expect(r.items[0].confidence.name).toBe(92);
     expect(r.items[0].confidence.price).toBe(41);
   });
+
+  it('joins item names with the qty/price/amount printed on the next line', () => {
+    const r = parse(`
+      SEAROCK RESTAURANT
+      ITEM   QTY   PRICE   AMOUNT
+      WATER    1   20.00   20.00
+      BUTTER GARLIC PRAWN
+        1    450.00   450.00
+      TAWA CALAMARI
+      \\   450.00 © 450.00
+      LEMON SODA/LEMON JUICE
+        2    100.00   200.00
+      ITEM: 8 QTY: 9
+      AMOUNT : 2370.00
+    `);
+    expect(r.items.map((i) => [i.name, i.qty, i.totalPaise])).toEqual([
+      ['WATER', 1, 2000],
+      ['BUTTER GARLIC PRAWN', 1, 45000],
+      ['TAWA CALAMARI', 1, 45000],
+      ['LEMON SODA/LEMON JUICE', 2, 20000],
+    ]);
+  });
+
+  it('drops stray zeros instead of gluing them onto names', () => {
+    const r = parse(`WAIER 0.00 20.0\nCHILLI PANEER 0 350.00`);
+    expect(r.items.map((i) => [i.name, i.totalPaise])).toEqual([
+      ['WAIER', 2000],
+      ['CHILLI PANEER', 35000],
+    ]);
+  });
 });
