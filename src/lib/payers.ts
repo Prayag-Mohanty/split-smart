@@ -4,7 +4,7 @@
  */
 import { formatINR, type Paise } from './money';
 import { personName } from './people';
-import { expenseTotal } from './split';
+import { expenseShares, expenseTotal } from './split';
 import type { Expense, Group, MemberId } from './types';
 
 /** Paise paid per member for an expense, always summing to its total. */
@@ -60,4 +60,30 @@ export function payersDetail(group: Pick<Group, 'meId' | 'members'>, expense: Ex
     .sort(([a], [b]) => order.indexOf(a) - order.indexOf(b))
     .map(([id, amt]) => `${group.members.find((m) => m.id === id)?.name ?? 'Unknown'} ${formatINR(amt)}`)
     .join(' + ');
+}
+
+/** What one expense means for "you": lent (others owe you), borrowed (you owe), even, or not involved. */
+export interface MyStake {
+  kind: 'lent' | 'borrowed' | 'even' | 'none';
+  amount: Paise;
+}
+
+/** Null when nobody in the group is marked as "you" on this device. */
+export function myStake(group: Pick<Group, 'meId' | 'members'>, expense: Expense): MyStake | null {
+  const me = group.meId;
+  if (!me) return null;
+  const paid = expensePayers(expense)[me] ?? 0;
+  const shares = expenseShares(
+    expense,
+    group.members.map((m) => m.id),
+  );
+  if (!paid && !(me in shares)) return { kind: 'none', amount: 0 };
+  const net = paid - (shares[me] ?? 0);
+  return net > 0 ? { kind: 'lent', amount: net } : net < 0 ? { kind: 'borrowed', amount: -net } : { kind: 'even', amount: 0 };
+}
+
+/** Short "who paid" for list rows: "Sushil paid", "You and Arjun paid", "3 people paid". */
+export function paidByShort(group: Pick<Group, 'meId' | 'members'>, expense: Expense): string {
+  const n = Object.keys(expensePayers(expense)).length;
+  return n > 2 ? `${n} people paid` : paidByPhrase(group, expense);
 }
