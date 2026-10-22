@@ -118,12 +118,14 @@ function Flow({ group, editing }: { group: Group; editing?: Extract<Group['expen
       if (!autoCategorize || d.items.length === 0) return;
       setCategorizing(true);
       try {
-        const cats: Category[] = await categorize(d.items.map((i) => i.name || 'item'));
-        const byId = new Map(d.items.map((it, i) => [it.id, cats[i]]));
+        const { categories, modelError } = await categorize(d.items.map((i) => i.name || 'item'));
+        const byId = new Map<string, Category>();
+        d.items.forEach((it, i) => categories[i] && byId.set(it.id, categories[i]!));
         setDraft((cur) => ({
           ...cur,
           items: cur.items.map((it) => (it.categoryLocked || !byId.has(it.id) ? it : { ...it, category: byId.get(it.id)! })),
         }));
+        if (modelError) throw modelError;
       } catch {
         // Say it once per session, not on every receipt.
         if (!categorizerWarned) {

@@ -58,8 +58,10 @@ function Editor({ groupId, existing }: { groupId: string; existing?: ManualExpen
     if (!text.trim()) return;
     setSuggesting(true);
     try {
-      const [c] = await categorize([text]);
-      setCategory((cur) => (categoryTouched ? cur : c));
+      const {
+        categories: [c],
+      } = await categorize([text]);
+      if (c) setCategory((cur) => (categoryTouched ? cur : c));
     } catch {
       /* model unavailable (offline?) — keep the manual choice */
     } finally {
