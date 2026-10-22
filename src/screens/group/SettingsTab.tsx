@@ -15,7 +15,7 @@ import { ExportActions } from './ExportActions';
 const MEMBER_EMOJIS = ['', '😎', '🦁', '🐼', '🦊', '🐯', '🐸', '🐵', '🦄', '🐙', '🌟', '⚡'];
 
 export function SettingsTab({ group }: { group: Group }) {
-  const { renameGroup, deleteGroup, addMember, removeMember, saveRecurring, deleteRecurring, settings, updateSettings } = useStore();
+  const { renameGroup, deleteGroup, addMember, removeMember, saveRecurring, deleteRecurring, settings, updateSettings, setMe } = useStore();
   const [name, setName] = useState(group.name);
   const [newName, setNewName] = useState('');
   const [editing, setEditing] = useState<Member | null>(null);
@@ -58,8 +58,16 @@ export function SettingsTab({ group }: { group: Group }) {
               <li key={m.id} className="list-row static">
                 <Avatar member={m} />
                 <span className="grow min0">
-                  <span className="row-title">{m.name}</span>
+                  <span className="row-title">
+                    {m.name}
+                    {m.id === group.meId && <span className="pill pill-ok">You</span>}
+                  </span>
                   <span className="row-sub">{m.upiId ? `UPI: ${m.upiId}` : 'No UPI ID'}</span>
+                  {m.id !== group.meId && (
+                    <button type="button" className="link-btn" onClick={() => setMe(group.id, m.id)} title="Show this member as “You” on this device">
+                      This is me
+                    </button>
+                  )}
                 </span>
                 <button type="button" className="icon-btn" aria-label={`Edit ${m.name}`} onClick={() => setEditing(m)}>
                   <Icon name="edit" size={18} />

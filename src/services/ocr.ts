@@ -29,7 +29,7 @@ const STAGES: Record<string, [string, number, number]> = {
   'initializing tesseract': ['Starting OCR engine', 0.1, 0.05],
   'loading language traineddata': ['Downloading English model (first time only)', 0.15, 0.2],
   'loading language traineddata (from cache)': ['Loading English model', 0.15, 0.2],
-  'initializing api': ['Preparing', 0.35, 0.05],
+  'initializing api': ['Preparing to read', 0.35, 0.05],
   'recognizing text': ['Reading text', 0.4, 0.6],
 };
 

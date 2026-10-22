@@ -32,7 +32,7 @@ function Editor({ groupId, existing }: { groupId: string; existing?: ManualExpen
 
   const [description, setDescription] = useState(existing?.description ?? '');
   const [total, setTotal] = useState<number | undefined>(existing?.totalPaise);
-  const [payerId, setPayerId] = useState(existing?.payerId ?? group.members[0]?.id ?? '');
+  const [payerId, setPayerId] = useState(existing?.payerId ?? group.meId ?? group.members[0]?.id ?? '');
   const [date, setDate] = useState(existing?.date ?? todayIso());
   const [category, setCategory] = useState<Category>(existing?.category ?? 'Other');
   const [categoryTouched, setCategoryTouched] = useState(!!existing);
@@ -171,7 +171,7 @@ function Editor({ groupId, existing }: { groupId: string; existing?: ManualExpen
                 {group.members.map((m) => (
                   <button key={m.id} type="button" role="radio" aria-checked={payerId === m.id} className={`payer${payerId === m.id ? ' selected' : ''}`} onClick={() => setPayerId(m.id)}>
                     <Avatar member={m} size="sm" />
-                    {m.name}
+                    {m.id === group.meId ? `${m.name} (you)` : m.name}
                   </button>
                 ))}
               </div>

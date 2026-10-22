@@ -1,25 +1,59 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Avatar } from '../../components/Avatar';
+import { Confetti } from '../../components/Confetti';
+import { DebtGraph } from '../../components/DebtGraph';
 import { Icon } from '../../components/Icon';
 import { Modal } from '../../components/Modal';
 import { toast } from '../../components/Toast';
 import { Amount, Banner, EmptyState } from '../../components/ui';
 import { todayIso } from '../../lib/ids';
 import { formatINR } from '../../lib/money';
-import { computeMemberStats, suggestSettlements, type Transfer } from '../../lib/settle';
+import { balanceVerb, isMe, personName } from '../../lib/people';
+import { computeMemberStats, rawDebts, suggestSettlements, type Transfer } from '../../lib/settle';
 import type { Group, Member } from '../../lib/types';
 import { buildUpiLink, isValidVpa } from '../../lib/upi';
 import { qrDataUrl } from '../../services/qr';
 import { useStore } from '../../store/useStore';
 import { ExportActions } from './ExportActions';
 
-export function BalancesTab({ group }: { group: Group }) {
+/** Record a suggested payment, with an undo toast. */
+function useSettle(group: Group) {
   const addSettlement = useStore((s) => s.addSettlement);
+  const deleteSettlement = useStore((s) => s.deleteSettlement);
+  return (t: Transfer) => {
+    addSettlement(group.id, { fromId: t.fromId, toId: t.toId, amountPaise: t.amountPaise, date: todayIso(), note: 'Settled up' });
+    toast(`${personName(group, t.fromId)} paid ${personName(group, t.toId, { lower: true })} ${formatINR(t.amountPaise)}`, 'success', {
+      label: 'Undo',
+      onClick: () => {
+        const latest = useStore.getState().groups.find((g) => g.id === group.id)?.settlements[0];
+        if (latest) deleteSettlement(group.id, latest.id);
+      },
+    });
+  };
+}
+
+export function BalancesTab({ group }: { group: Group }) {
   const deleteSettlement = useStore((s) => s.deleteSettlement);
   const stats = useMemo(() => computeMemberStats(group), [group]);
   const transfers = useMemo(() => suggestSettlements(group), [group]);
+  const before = useMemo(() => rawDebts(group), [group]);
   const byId = useMemo(() => new Map(group.members.map((m) => [m.id, m])), [group.members]);
   const [paying, setPaying] = useState<Transfer | null>(null);
+  const [celebrate, setCelebrate] = useState(false);
+  const settle = useSettle(group);
+
+  // Celebrate the moment the last balance is cleared (not on every visit to a settled group).
+  const prevCount = useRef(transfers.length);
+  useEffect(() => {
+    if (prevCount.current > 0 && transfers.length === 0) {
+      setCelebrate(true);
+      navigator.vibrate?.(30);
+      const t = setTimeout(() => setCelebrate(false), 3000);
+      prevCount.current = 0;
+      return () => clearTimeout(t);
+    }
+    prevCount.current = transfers.length;
+  }, [transfers.length]);
 
   if (group.expenses.length === 0 && group.settlements.length === 0) {
     return (
@@ -32,19 +66,66 @@ export function BalancesTab({ group }: { group: Group }) {
   const maxAbs = Math.max(1, ...group.members.map((m) => Math.abs(stats[m.id]?.net ?? 0)));
   const nonZero = group.members.filter((m) => (stats[m.id]?.net ?? 0) !== 0).length;
 
-  const settle = (t: Transfer) => {
-    addSettlement(group.id, { fromId: t.fromId, toId: t.toId, amountPaise: t.amountPaise, date: todayIso(), note: 'Settled up' });
-    toast(`${byId.get(t.fromId)?.name} paid ${byId.get(t.toId)?.name} ${formatINR(t.amountPaise)}`, 'success', {
-      label: 'Undo',
-      onClick: () => {
-        const latest = useStore.getState().groups.find((g) => g.id === group.id)?.settlements[0];
-        if (latest) deleteSettlement(group.id, latest.id);
-      },
-    });
-  };
-
   return (
     <div className="stack-lg">
+      {celebrate && <Confetti />}
+
+      {transfers.length === 0 ? (
+        <div className="card all-settled" role="status">
+          <span className="all-settled-icon" aria-hidden="true">
+            🎉
+          </span>
+          <div>
+            <h2>All settled</h2>
+            <p className="muted">Everyone is settled up. 🎉 Nobody owes anybody anything.</p>
+          </div>
+        </div>
+      ) : (
+        <section aria-labelledby="settle-heading">
+          <h2 id="settle-heading" className="section-title">
+            Suggested payments
+          </h2>
+          <p className="muted small">
+            {transfers.length} payment{transfers.length > 1 ? 's' : ''} settle{transfers.length === 1 ? 's' : ''} everything — the minimum possible for {nonZero} people with open balances.
+          </p>
+          <ul className="stack">
+            {transfers.map((t, i) => {
+              const from = byId.get(t.fromId);
+              const to = byId.get(t.toId);
+              if (!from || !to) return null;
+              return (
+                <li key={`${t.fromId}-${t.toId}-${i}`} className={`card transfer${isMe(group, t.fromId) ? ' transfer-mine' : ''}`}>
+                  <div className="transfer-people">
+                    <span className="transfer-person">
+                      <Avatar member={from} />
+                      <span>{personName(group, from.id)}</span>
+                    </span>
+                    <span className="transfer-arrow">
+                      <strong>{formatINR(t.amountPaise)}</strong>
+                      <Icon name="arrowRight" />
+                    </span>
+                    <span className="transfer-person">
+                      <Avatar member={to} />
+                      <span>{personName(group, to.id)}</span>
+                    </span>
+                  </div>
+                  <div className="transfer-actions">
+                    <button type="button" className="btn btn-sm btn-pay" onClick={() => setPaying(t)}>
+                      <Icon name="qr" size={16} /> Pay {formatINR(t.amountPaise, { compact: true })} via UPI
+                    </button>
+                    <button type="button" className="btn btn-sm" onClick={() => settle(t)}>
+                      <Icon name="check" size={16} /> Mark settled
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {before.length > transfers.length && transfers.length > 0 && <DebtGraph members={group.members} before={before} after={transfers} meId={group.meId} />}
+
       <section aria-labelledby="net-heading">
         <h2 id="net-heading" className="section-title">
           Net balances
@@ -58,14 +139,12 @@ export function BalancesTab({ group }: { group: Group }) {
                 <Avatar member={m} />
                 <div className="grow min0">
                   <div className="balance-top">
-                    <strong>{m.name}</strong>
-                    <span className={s.net > 0 ? 'pos' : s.net < 0 ? 'neg' : 'muted'}>
-                      {s.net > 0 ? `gets back ${formatINR(s.net)}` : s.net < 0 ? `owes ${formatINR(-s.net)}` : 'settled up'}
-                    </span>
+                    <strong>{personName(group, m.id)}</strong>
+                    <span className={s.net > 0 ? 'pos' : s.net < 0 ? 'owe' : 'muted'}>{balanceVerb(group, m.id, s.net)}</span>
                   </div>
                   <div className="diverge" aria-hidden="true">
                     <span className="diverge-axis" />
-                    {s.net !== 0 && <span className={`diverge-bar ${s.net > 0 ? 'pos-bg' : 'neg-bg'}`} style={s.net > 0 ? { left: '50%', width: `${pct}%` } : { right: '50%', width: `${pct}%` }} />}
+                    {s.net !== 0 && <span className={`diverge-bar ${s.net > 0 ? 'pos-bg' : 'owe-bg'}`} style={s.net > 0 ? { left: '50%', width: `${pct}%` } : { right: '50%', width: `${pct}%` }} />}
                   </div>
                   <div className="small muted">
                     Paid {formatINR(s.paid)} · Share {formatINR(s.consumed)}
@@ -75,54 +154,6 @@ export function BalancesTab({ group }: { group: Group }) {
             );
           })}
         </ul>
-      </section>
-
-      <section aria-labelledby="settle-heading">
-        <h2 id="settle-heading" className="section-title">
-          Suggested payments
-        </h2>
-        {transfers.length === 0 ? (
-          <Banner tone="ok">Everyone is settled up. 🎉</Banner>
-        ) : (
-          <>
-            <p className="muted small">
-              {transfers.length} payment{transfers.length > 1 ? 's' : ''} settle{transfers.length === 1 ? 's' : ''} everything — the minimum possible for {nonZero} people with open balances.
-            </p>
-            <ul className="stack">
-              {transfers.map((t, i) => {
-                const from = byId.get(t.fromId);
-                const to = byId.get(t.toId);
-                if (!from || !to) return null;
-                return (
-                  <li key={`${t.fromId}-${t.toId}-${i}`} className="card transfer">
-                    <div className="transfer-people">
-                      <span className="transfer-person">
-                        <Avatar member={from} />
-                        <span>{from.name}</span>
-                      </span>
-                      <span className="transfer-arrow">
-                        <strong>{formatINR(t.amountPaise)}</strong>
-                        <Icon name="arrowRight" />
-                      </span>
-                      <span className="transfer-person">
-                        <Avatar member={to} />
-                        <span>{to.name}</span>
-                      </span>
-                    </div>
-                    <div className="transfer-actions">
-                      <button type="button" className="btn btn-sm" onClick={() => setPaying(t)}>
-                        <Icon name="qr" size={16} /> Pay via UPI
-                      </button>
-                      <button type="button" className="btn btn-sm btn-primary" onClick={() => settle(t)}>
-                        <Icon name="check" size={16} /> Mark settled
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </>
-        )}
       </section>
 
       {group.settlements.length > 0 && (
@@ -136,7 +167,7 @@ export function BalancesTab({ group }: { group: Group }) {
                 <Icon name="check" className="pos" />
                 <span className="grow">
                   <span className="row-title">
-                    {byId.get(s.fromId)?.name ?? '?'} paid {byId.get(s.toId)?.name ?? '?'}
+                    {personName(group, s.fromId)} paid {personName(group, s.toId, { lower: true })}
                   </span>
                   <span className="row-sub">{new Date(s.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
                 </span>
@@ -157,12 +188,48 @@ export function BalancesTab({ group }: { group: Group }) {
   );
 }
 
+/** Compact balances for the desktop sidebar next to the expense list. */
+export function BalancesSidebar({ group }: { group: Group }) {
+  const stats = useMemo(() => computeMemberStats(group), [group]);
+  const transfers = useMemo(() => suggestSettlements(group), [group]);
+  return (
+    <div className="card stack sidebar-card">
+      <h2 className="card-title">Balances</h2>
+      <ul className="sidebar-balances">
+        {group.members.map((m) => {
+          const net = stats[m.id]?.net ?? 0;
+          return (
+            <li key={m.id}>
+              <Avatar member={m} size="sm" />
+              <span className="grow">{personName(group, m.id)}</span>
+              <strong className={net > 0 ? 'pos' : net < 0 ? 'owe' : 'muted'}>{net === 0 ? 'settled' : formatINR(net, { sign: true })}</strong>
+            </li>
+          );
+        })}
+      </ul>
+      <h3 className="eyebrow">{transfers.length ? `${transfers.length} payment${transfers.length > 1 ? 's' : ''} to settle` : 'All settled'}</h3>
+      <ul className="sidebar-transfers">
+        {transfers.map((t, i) => (
+          <li key={i}>
+            {personName(group, t.fromId)} <Icon name="arrowRight" size={14} /> {personName(group, t.toId)} <strong>{formatINR(t.amountPaise)}</strong>
+          </li>
+        ))}
+      </ul>
+      <a className="btn btn-sm" href={`#/g/${group.id}/balances`}>
+        Settle up <Icon name="arrowRight" size={16} />
+      </a>
+    </div>
+  );
+}
+
 function UpiModal({ transfer, group, onClose, onSettled }: { transfer: Transfer | null; group: Group; onClose: () => void; onSettled: (t: Transfer) => void }) {
   const updateMember = useStore((s) => s.updateMember);
   const from = group.members.find((m) => m.id === transfer?.fromId);
   const to = group.members.find((m) => m.id === transfer?.toId);
   const [vpa, setVpa] = useState('');
   const [qr, setQr] = useState('');
+  /** Set after "Open UPI app": we ask whether the payment went through when the user returns. */
+  const [askConfirm, setAskConfirm] = useState(false);
 
   const link = transfer && to?.upiId ? buildUpiLink({ payeeVpa: to.upiId, payeeName: to.name, amountPaise: transfer.amountPaise, note: `SplitSmart: ${group.name}` }) : '';
 
@@ -170,22 +237,44 @@ function UpiModal({ transfer, group, onClose, onSettled }: { transfer: Transfer 
     setQr('');
     if (link) qrDataUrl(link).then(setQr, () => setQr(''));
   }, [link]);
-  useEffect(() => setVpa(''), [transfer]);
+  useEffect(() => {
+    setVpa('');
+    setAskConfirm(false);
+  }, [transfer]);
+
+  const finish = () => {
+    if (transfer) onSettled(transfer);
+    onClose();
+  };
 
   return (
     <Modal open={!!transfer} title="Pay via UPI" onClose={onClose}>
       {transfer && from && to && (
         <div className="stack center-text">
           <p>
-            <strong>{from.name}</strong> pays <strong>{to.name}</strong>
+            <strong>{personName(group, from.id)}</strong> {isMe(group, from.id) ? 'pay' : 'pays'} <strong>{personName(group, to.id, { lower: true })}</strong>
           </p>
           <p className="big-amount">{formatINR(transfer.amountPaise)}</p>
           {to.upiId ? (
             <>
+              {askConfirm && (
+                <div className="confirm-paid" role="alertdialog" aria-labelledby="paid-q">
+                  <strong id="paid-q">Did the payment go through?</strong>
+                  <div className="row-wrap center">
+                    <button type="button" className="btn btn-primary" onClick={finish}>
+                      <Icon name="check" size={16} /> Yes, mark settled
+                    </button>
+                    <button type="button" className="btn" onClick={() => setAskConfirm(false)}>
+                      Not yet
+                    </button>
+                  </div>
+                </div>
+              )}
               <div className="qr-box">{qr ? <img src={qr} alt={`UPI QR code to pay ${to.name} ${formatINR(transfer.amountPaise)}`} width={220} height={220} /> : <span className="muted">Generating QR…</span>}</div>
               <p className="small muted">Scan with any UPI app, or on a phone tap the button below. UPI ID: {to.upiId}</p>
+              <p className="small muted">Some apps block pre-filled links opened from a browser — if so, scan the QR from another phone.</p>
               <div className="row-wrap center">
-                <a className="btn btn-primary" href={link}>
+                <a className="btn btn-primary" href={link} onClick={() => setTimeout(() => setAskConfirm(true), 400)}>
                   Open UPI app
                 </a>
                 <button
@@ -198,14 +287,7 @@ function UpiModal({ transfer, group, onClose, onSettled }: { transfer: Transfer 
                   <Icon name="link" size={16} /> Copy link
                 </button>
               </div>
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => {
-                  onSettled(transfer);
-                  onClose();
-                }}
-              >
+              <button type="button" className="btn btn-ghost" onClick={finish}>
                 <Icon name="check" size={16} /> I've paid — mark settled
               </button>
             </>

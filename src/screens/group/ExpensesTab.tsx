@@ -3,6 +3,7 @@ import { Avatar } from '../../components/Avatar';
 import { Icon } from '../../components/Icon';
 import { CATEGORY_META, EmptyState } from '../../components/ui';
 import { formatINR } from '../../lib/money';
+import { paidPhrase } from '../../lib/people';
 import { expenseShares, expenseTotal } from '../../lib/split';
 import { CATEGORIES, type Category, type Group } from '../../lib/types';
 
@@ -77,11 +78,15 @@ export function ExpensesTab({ group }: { group: Group }) {
                     <span className="grow min0">
                       <span className="row-title">
                         {e.description}
-                        {e.kind === 'itemized' && <Icon name="receipt" size={14} className="muted inline-icon" title="Itemized receipt" />}
+                        {e.kind === 'itemized' && (
+                          <span className="pill pill-neutral" title="Itemized receipt">
+                            <Icon name="receipt" size={12} /> Itemised · {e.items.length}
+                          </span>
+                        )}
                         {e.recurringId && <Icon name="repeat" size={14} className="muted inline-icon" title="Recurring" />}
                       </span>
                       <span className="row-sub">
-                        {payer && <Avatar member={payer} size="sm" />} {payer?.name ?? 'Someone'} paid · split {n} way{n === 1 ? '' : 's'}
+                        {payer && <Avatar member={payer} size="sm" />} {paidPhrase(group, e.payerId)} · split {n} way{n === 1 ? '' : 's'}
                         {n === 0 && <span className="error-text"> (needs fixing)</span>}
                       </span>
                     </span>

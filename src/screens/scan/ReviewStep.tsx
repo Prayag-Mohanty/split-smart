@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../../components/Icon';
+import { Modal } from '../../components/Modal';
 import { MoneyInput } from '../../components/MoneyInput';
 import { Banner, CategorySelect } from '../../components/ui';
 import { useClassifierStatus } from '../../hooks/useCategorizer';
@@ -27,7 +28,20 @@ const KIND_LABEL: Record<AdjustmentKind, string> = { tax: 'Tax / GST', service: 
 
 export function ReviewStep({ draft, update, image, categorizing, canRescan, onRotate, onRetake, onManualFallback, onNext }: ReviewStepProps) {
   const [activeLine, setActiveLine] = useState<number | undefined>();
-  const [showImage, setShowImage] = useState(true);
+  // Phones start with a compact, sticky strip so the fields to fix come first; desktop shows the photo beside the table.
+  const [showImage, setShowImage] = useState(() => window.matchMedia?.('(min-width: 960px)').matches ?? true);
+  const [zoomed, setZoomed] = useState(false);
+  const [zoom, setZoom] = useState<1 | 2>(1);
+  const stageRef = useRef<HTMLDivElement>(null);
+
+  // Keep the line being edited in view inside the photo strip / panel.
+  useEffect(() => {
+    const stage = stageRef.current;
+    const box = activeLine !== undefined ? image?.lines[activeLine]?.bbox : undefined;
+    if (!stage || !box || !image) return;
+    const scale = stage.scrollWidth / image.width;
+    stage.scrollTo({ top: Math.max(0, box.y0 * scale - stage.clientHeight / 3), behavior: 'smooth' });
+  }, [activeLine, image, showImage]);
   const { status, progress } = useClassifierStatus();
 
   const check = useMemo(
@@ -82,7 +96,7 @@ export function ReviewStep({ draft, update, image, categorizing, canRescan, onRo
 
   return (
     <div className="review-layout">
-      <aside className="review-image" aria-label="Original receipt">
+      <aside className={`review-image${image && !showImage ? ' is-strip' : ''}`} aria-label="Original receipt">
         {image ? (
           <div className="card">
             <div className="review-image-head">
@@ -91,29 +105,28 @@ export function ReviewStep({ draft, update, image, categorizing, canRescan, onRo
                 {showImage ? 'Hide' : 'Show'}
               </button>
             </div>
+            <div
+              ref={stageRef}
+              className={`image-stage${showImage ? '' : ' compact'}`}
+              onClick={() => !showImage && setZoomed(true)}
+              role={showImage ? undefined : 'button'}
+              tabIndex={showImage ? undefined : 0}
+              aria-label={showImage ? undefined : 'Open the receipt photo full screen'}
+              onKeyDown={(e) => !showImage && (e.key === 'Enter' || e.key === ' ') && setZoomed(true)}
+            >
+              <ReceiptImage image={image} activeLine={activeLine} />
+              {!showImage && (
+                <span className="strip-hint">
+                  <Icon name="image" size={14} /> Tap to zoom
+                </span>
+              )}
+            </div>
             {showImage && (
               <>
-                <div className="image-stage">
-                  <img src={image.url} alt="Scanned receipt" />
-                  <svg viewBox={`0 0 ${image.width} ${image.height}`} className="ocr-overlay" aria-hidden="true">
-                    {image.lines.flatMap((l, li) =>
-                      l.words
-                        .filter((w) => w.bbox && w.confidence < LOW_CONFIDENCE)
-                        .map((w, wi) => <rect key={`${li}-${wi}`} className="ocr-low" x={w.bbox!.x0} y={w.bbox!.y0} width={w.bbox!.x1 - w.bbox!.x0} height={w.bbox!.y1 - w.bbox!.y0} rx={4} />),
-                    )}
-                    {activeLine !== undefined && image.lines[activeLine]?.bbox && (
-                      <rect
-                        className="ocr-active"
-                        x={image.lines[activeLine].bbox!.x0 - 6}
-                        y={image.lines[activeLine].bbox!.y0 - 4}
-                        width={image.lines[activeLine].bbox!.x1 - image.lines[activeLine].bbox!.x0 + 12}
-                        height={image.lines[activeLine].bbox!.y1 - image.lines[activeLine].bbox!.y0 + 8}
-                        rx={6}
-                      />
-                    )}
-                  </svg>
-                </div>
                 <div className="preview-tools" role="toolbar" aria-label="Image tools">
+                  <button type="button" className="btn btn-sm" onClick={() => setZoomed(true)} aria-label="Open full screen">
+                    <Icon name="image" size={16} /> Zoom
+                  </button>
                   <button type="button" className="btn btn-sm" onClick={() => onRotate(-90)} disabled={!canRescan} aria-label="Rotate left and re-scan">
                     <Icon name="rotateL" size={16} />
                   </button>
@@ -142,6 +155,20 @@ export function ReviewStep({ draft, update, image, categorizing, canRescan, onRo
           )
         )}
       </aside>
+      {image && (
+        <Modal open={zoomed} title="Original receipt" onClose={() => setZoomed(false)} wide>
+          <div className="zoom-controls">
+            <button type="button" className="btn btn-sm" onClick={() => setZoom((z) => (z === 1 ? 2 : 1))} aria-pressed={zoom === 2}>
+              {zoom === 1 ? 'Zoom in 2×' : 'Fit to screen'}
+            </button>
+          </div>
+          <div className="zoom-stage">
+            <div style={{ width: `${zoom * 100}%` }}>
+              <ReceiptImage image={image} activeLine={activeLine} />
+            </div>
+          </div>
+        </Modal>
+      )}
 
       <section className="review-data stack" aria-label="Parsed receipt">
         {image && noItems && (
@@ -376,6 +403,24 @@ export function ReviewStep({ draft, update, image, categorizing, canRescan, onRo
           {needsConfirm ? `Confirm ${formatINR(check.computedPaise)} & assign` : mismatch ? 'Continue anyway' : 'Next: assign items'} <Icon name="arrowRight" />
         </button>
       </div>
+    </div>
+  );
+}
+
+/** The receipt photo with low-confidence words and the active line outlined. */
+function ReceiptImage({ image, activeLine }: { image: ScanImage; activeLine?: number }) {
+  const active = activeLine !== undefined ? image.lines[activeLine]?.bbox : undefined;
+  return (
+    <div className="receipt-image">
+      <img src={image.url} alt="Scanned receipt" />
+      <svg viewBox={`0 0 ${image.width} ${image.height}`} className="ocr-overlay" aria-hidden="true">
+        {image.lines.flatMap((l, li) =>
+          l.words
+            .filter((w) => w.bbox && w.confidence < LOW_CONFIDENCE)
+            .map((w, wi) => <rect key={`${li}-${wi}`} className="ocr-low" x={w.bbox!.x0} y={w.bbox!.y0} width={w.bbox!.x1 - w.bbox!.x0} height={w.bbox!.y1 - w.bbox!.y0} rx={4} />),
+        )}
+        {active && <rect className="ocr-active" x={active.x0 - 6} y={active.y0 - 4} width={active.x1 - active.x0 + 12} height={active.y1 - active.y0 + 8} rx={6} />}
+      </svg>
     </div>
   );
 }

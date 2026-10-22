@@ -8,6 +8,10 @@ SplitSmart is our Web Brawl GC 2026 entry. It is a static web app with no backen
 | --- | --- | --- | --- |
 | ![Review](docs/screenshots/review-desktop.png) | ![Assign](docs/screenshots/assign-mobile.png) | ![Split](docs/screenshots/split-mobile.png) | ![UPI](docs/screenshots/upi-mobile.png) |
 
+| Welcome | Group (desktop) | Watch the debts shrink | Shareable bill card |
+| --- | --- | --- | --- |
+| ![Welcome](docs/screenshots/welcome-mobile.png) | ![Group](docs/screenshots/group-desktop.png) | ![Debt graph](docs/screenshots/debts-shrink-dark.png) | ![Bill card](docs/screenshots/bill-card.png) |
+
 ---
 
 ## Quick start
@@ -70,6 +74,15 @@ No training or fine-tuning, no paid APIs, no API keys. Receipt images never leav
 - **Multi-receipt batch scan:** select several photos at once and review them one after another.
 - **Accessibility:** semantic landmarks, skip link, labelled controls, `<dialog>` modals with Esc and focus handling, visible focus rings, `prefers-reduced-motion`, AA-contrast colours, and light/dark/system themes.
 - **Robustness extras:** auto-orientation (if a read is poor, the 90° and 270° rotations are tried and the best is kept), a raw-OCR-text viewer, a "no items found" path to manual entry, and a camera-denied fallback to upload.
+- **Real-receipt OCR:** item names printed on one line with `qty price amount` on the next are joined; images are upscaled so compressed phone photos read well; GST keywords survive OCR digit swaps (`6ST`, `SG5T`); one-tap 5/12/18% GST, and the app spots a missing GST slab when the total doesn't add up.
+
+### Original features (beyond the brief)
+- **"You" everywhere:** your name is asked once and remembered. Balances read "You get back ₹672" / "You owe Riya ₹168", you're the default payer, and imported groups ask "Which one is you?".
+- **Watch the debts shrink:** an animated graph on Balances collapses every original IOU into the minimum set of payments ("5 IOUs → 3 payments"), making the settlement algorithm visible.
+- **WhatsApp-ready bill card:** one tap draws an image of the split, with each person's share and a UPI QR to pay the payer, and opens the phone's share sheet (or downloads it).
+- **Drag items onto faces:** in Assign, drag an item by its handle onto a person in the dock; the running totals count up. Tap-to-toggle remains for accessibility.
+- **Consequence line:** the Split screen shows "For this bill: Arjun → You ₹168 · …" and how many payments the whole group needs after saving.
+- **Polish:** first-run hero with the demo as the main action, a status strip ("You get back ₹212 · 3 payments pending → View"), a desktop two-column layout with live balances, step transitions, a sticky photo strip with tap-to-zoom on phones, amber for money you owe, a "?" badge on low-confidence fields, and confetti plus a short vibration when everyone is settled.
 
 ---
 
