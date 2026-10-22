@@ -4,6 +4,15 @@
 
 SplitSmart is our Web Brawl GC 2026 entry. It is a static web app with no backend. Photos of receipts are read **on your device** with Tesseract.js. Items are categorised by an on-device zero-shot model, and every group, expense and settlement is stored in your browser.
 
+### ▶ Live app: **https://prayag-mohanty.github.io/split-smart/**
+
+Open it on a phone and tap **Try a demo group** to explore a ready-made group, or **Create a group** and scan one of the sample receipts in [`samples/`](samples). Add it to your home screen to install it; after the first scan it also works offline.
+
+<p align="center">
+  <img src="docs/demo.gif" alt="Walkthrough: create a group, scan a receipt, review, assign items, see the split and settle up" width="324">
+  <br><em>The judging scenario end to end: create group → scan → review (₹840 matches) → assign → proportional GST split → settle.</em>
+</p>
+
 | Review (desktop)                               | Assign (phone)                                | Split (phone)                               | UPI settle-up                           |
 | ---------------------------------------------- | --------------------------------------------- | ------------------------------------------- | --------------------------------------- |
 | ![Review](docs/screenshots/review-desktop.png) | ![Assign](docs/screenshots/assign-mobile.png) | ![Split](docs/screenshots/split-mobile.png) | ![UPI](docs/screenshots/upi-mobile.png) |
@@ -20,7 +29,10 @@ SplitSmart is our Web Brawl GC 2026 entry. It is a static web app with no backen
 npm install
 npm run dev        # http://localhost:5173
 npm test           # unit tests for money, split, settlement, parser, sharing, analytics
+npm run lint       # ESLint (TypeScript + React hooks)
+npm run format     # Prettier
 npm run build      # production build in dist/ (static, deploy anywhere)
+npm run test:e2e   # Playwright end-to-end tests on the build (real OCR on samples/)
 npm run samples    # regenerate the sample receipts in samples/ (needs Playwright + Chromium)
 ```
 
@@ -28,16 +40,18 @@ Requires Node 18+. `npm run dev` and `npm run build` first copy the OCR engine a
 
 **Deploying:** pushing to `main` runs `.github/workflows/deploy.yml`, which tests, builds and publishes to GitHub Pages. Enable it once under _Settings → Pages → Source: GitHub Actions_. The build uses a relative base path and hash routing, so the same `dist/` folder also works on Netlify or Vercel.
 
-**Try it in 10 seconds:** open the app, tap **Try a demo group**, or scan one of the images in [`samples/`](samples).
+**Try it in 10 seconds:** open the [live app](https://prayag-mohanty.github.io/split-smart/), tap **Try a demo group**, or scan one of the images in [`samples/`](samples).
+
+**Tests:** 80 unit tests (`tests/`) cover the money maths: every split mode, the rounding rule, proportional tax, minimum-payment settlement checked against brute force, the receipt parser, GST helpers, search, default splits and category hints. 8 end-to-end tests (`e2e/`) run the production build in a phone-sized browser with real OCR: the full judging flow and robustness cases 2, 3, 4, 5, 7 and 8. CI runs lint, formatting, unit tests, the build and the end-to-end tests on every pull request.
 
 ---
 
 ## Models used (all pretrained, used as-is, run client-side)
 
-| Purpose             | Model                                                                                        | Notes                                                                                                                                                    |
-| ------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| OCR                 | **Tesseract.js v5** with the English LSTM model (`@tesseract.js-data/eng`, `4.0.0_best_int`) | Runs in Tesseract's own Web Worker. Loaded only on the first scan, then cached (IndexedDB + service worker).                                             |
-| Item categorisation | **`Xenova/mobilebert-uncased-mnli`** via Transformers.js (zero-shot classification)          | Runs in our own Web Worker (`src/workers/classifier.worker.ts`). Loaded lazily on first use and cached by the browser. It never blocks the first screen. |
+| Purpose             | Model                                                                                        | Notes                                                                                                                                                                                                                                                                        |
+| ------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OCR                 | **Tesseract.js v5** with the English LSTM model (`@tesseract.js-data/eng`, `4.0.0_best_int`) | Runs in Tesseract's own Web Worker. Loaded only on the first scan, then cached (IndexedDB + service worker).                                                                                                                                                                 |
+| Item categorisation | **`Xenova/mobilebert-uncased-mnli`** via Transformers.js (zero-shot classification)          | Runs in our own Web Worker (`src/workers/classifier.worker.ts`). Loaded lazily on first use and cached by the browser. It never blocks the first screen. Obvious names ("soda", "cab", "wi-fi") are matched by keyword hints first, so the model only sees what it needs to. |
 
 No training or fine-tuning, no paid APIs, no API keys. Receipt images never leave the device and are not even stored: only the parsed items are saved.
 
@@ -150,6 +164,8 @@ src/
     settle.ts       balances + minimum-transaction settlement
     receiptParser.ts OCR lines → items, charges, totals, confidences
     analytics.ts    category / member / timeline totals
+    people.ts       second-person copy ("You owe Riya ₹168")
+    gst.ts, categoryHints.ts, search.ts, defaultSplit.ts
     upi.ts, share.ts, recurring.ts, exporters.ts, demo.ts, types.ts
   services/       # browser integrations (lazy-loaded)
     ocr.ts          Tesseract.js wrapper with staged progress
@@ -159,8 +175,10 @@ src/
   workers/classifier.worker.ts   Transformers.js zero-shot model
   store/useStore.ts              zustand store persisted to localStorage
   screens/                       Dashboard, group tabs, expense editor, scan flow
+    scan/review/                 photo panel, items, tax & charges, totals cards
   components/                    Avatar, Modal, MoneyInput, SplitEditor, Toasts…
 tests/            # vitest unit tests
+e2e/              # Playwright end-to-end tests (real OCR, phone viewport)
 samples/          # test receipts: clear, faded, rotated, no-total, non-receipt
 ```
 
@@ -168,14 +186,16 @@ samples/          # test receipts: clear, faded, rotated, no-total, non-receipt
 
 ## Robustness test cases (from the brief)
 
-| #   | Case                         | Behaviour                                                                                      |
-| --- | ---------------------------- | ---------------------------------------------------------------------------------------------- |
-| 1   | Clear GST bill               | `samples/restaurant-clear.png` parses fully and matches ₹840                                   |
-| 2   | Faded thermal receipt        | Adaptive contrast; low-confidence words highlighted yellow (`samples/canteen-faded.png`)       |
-| 3   | Rotated 90°                  | Auto-orientation retries 90°/270°; manual rotate and retake (`samples/restaurant-rotated.png`) |
-| 4   | Selfie / non-receipt         | "No items found" message plus manual entry (`samples/not-a-receipt.png`)                       |
-| 5   | No printed total             | Total computed from the items; user asked to confirm (`samples/grocery-no-total.png`)          |
-| 6   | ₹100 ÷ 3                     | ₹33.34 / ₹33.33 / ₹33.33 (unit-tested)                                                         |
-| 7   | Camera denied                | Clear message; upload stays available                                                          |
-| 8   | Offline after first visit    | PWA shell plus cached OCR assets                                                               |
-| 9   | 5 members, 10 mixed expenses | Minimum payments (unit-tested against brute force)                                             |
+"Tested by" names the automated test that checks each case on every pull request.
+
+| #   | Case                         | Behaviour                                                                                      | Tested by                     |
+| --- | ---------------------------- | ---------------------------------------------------------------------------------------------- | ----------------------------- |
+| 1   | Clear GST bill               | `samples/restaurant-clear.png` parses fully and matches ₹840                                   | `e2e/flow.spec.ts`            |
+| 2   | Faded thermal receipt        | Adaptive contrast; low-confidence words highlighted yellow (`samples/canteen-faded.png`)       | `e2e/robustness.spec.ts`      |
+| 3   | Rotated 90°                  | Auto-orientation retries 90°/270°; manual rotate and retake (`samples/restaurant-rotated.png`) | `e2e/robustness.spec.ts`      |
+| 4   | Selfie / non-receipt         | "No items found" message plus manual entry (`samples/not-a-receipt.png`)                       | `e2e/robustness.spec.ts`      |
+| 5   | No printed total             | Total computed from the items; user asked to confirm (`samples/grocery-no-total.png`)          | `e2e/robustness.spec.ts`      |
+| 6   | ₹100 ÷ 3                     | ₹33.34 / ₹33.33 / ₹33.33                                                                       | `tests/split.test.ts`, `e2e/` |
+| 7   | Camera denied                | Clear message; upload stays available                                                          | `e2e/robustness.spec.ts`      |
+| 8   | Offline after first visit    | PWA shell plus cached OCR assets; scanning works offline                                       | `e2e/robustness.spec.ts`      |
+| 9   | 5 members, 10 mixed expenses | Minimum payments, checked against brute force                                                  | `tests/settle.test.ts`        |
