@@ -3,6 +3,7 @@
  * category, payer, people involved, amount and date. Every word must match somewhere.
  */
 import { toDecimalString } from './money';
+import { expensePayers } from './payers';
 import { expenseTotal } from './split';
 import type { Expense, Group } from './types';
 
@@ -13,8 +14,8 @@ function haystack(expense: Expense, group: Group): string {
   const parts = [
     expense.description,
     expense.category,
-    name(expense.payerId),
-    expense.payerId === group.meId ? 'you me' : '',
+    ...Object.keys(expensePayers(expense)).map(name),
+    group.meId && expensePayers(expense)[group.meId] ? 'you me' : '',
     ...people.map(name),
     expense.kind === 'itemized' ? expense.items.map((i) => i.name).join(' ') : '',
     toDecimalString(expenseTotal(expense)),

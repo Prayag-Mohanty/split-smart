@@ -3,6 +3,7 @@
  * (PDF export lives in src/services/pdf.ts because it lazy-loads jsPDF.)
  */
 import { toDecimalString } from './money';
+import { payersDetail } from './payers';
 import { computeMemberStats, suggestSettlements } from './settle';
 import { expenseShares, expenseTotal } from './split';
 import type { Group } from './types';
@@ -31,7 +32,7 @@ export function groupToCsv(group: Group): string {
         e.date,
         e.description,
         e.category,
-        name(e.payerId),
+        e.payers ? payersDetail(group, e).replace(/₹/g, 'Rs ') : name(e.payerId),
         toDecimalString(expenseTotal(e)),
         ...group.members.map((m) => toDecimalString(shares[m.id] ?? 0)),
       ]),
