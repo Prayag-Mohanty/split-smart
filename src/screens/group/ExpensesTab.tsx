@@ -30,8 +30,12 @@ export function ExpensesTab({ group }: { group: Group }) {
     );
   }
 
+  // Only offer chips for categories this group actually uses (and none if there's just one).
+  const usedCategories = CATEGORIES.filter((c) => group.expenses.some((e) => e.category === c));
+  const activeFilter: Category | 'All' = usedCategories.includes(filter as Category) ? filter : 'All';
+
   const items = [...group.expenses]
-    .filter((e) => filter === 'All' || e.category === filter)
+    .filter((e) => activeFilter === 'All' || e.category === activeFilter)
     .filter((e) => matchesQuery(e, group, query))
     .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
 
@@ -69,17 +73,19 @@ export function ExpensesTab({ group }: { group: Group }) {
           </button>
         )}
       </div>
-      <div className="filter-row" role="radiogroup" aria-label="Filter by category">
-        {(['All', ...CATEGORIES] as const).map((c) => (
-          <button key={c} type="button" role="radio" aria-checked={filter === c} className={`chip-btn${filter === c ? ' active' : ''}`} onClick={() => setFilter(c)}>
-            {c !== 'All' && <span aria-hidden="true">{CATEGORY_META[c].emoji} </span>}
-            {c}
-          </button>
-        ))}
-      </div>
+      {usedCategories.length > 1 && (
+        <div className="filter-row" role="radiogroup" aria-label="Filter by category">
+          {(['All', ...usedCategories] as const).map((c) => (
+            <button key={c} type="button" role="radio" aria-checked={activeFilter === c} className={`chip-btn${activeFilter === c ? ' active' : ''}`} onClick={() => setFilter(c)}>
+              {c !== 'All' && <span aria-hidden="true">{CATEGORY_META[c].emoji} </span>}
+              {c}
+            </button>
+          ))}
+        </div>
+      )}
       {sections.length === 0 && (
         <p className="muted center-text">
-          {query ? `No ${filter === 'All' ? '' : `${filter.toLowerCase()} `}expenses match “${query}”.` : `No ${filter.toLowerCase()} expenses.`}
+          {query ? `No ${activeFilter === 'All' ? '' : `${activeFilter.toLowerCase()} `}expenses match “${query}”.` : `No ${activeFilter.toLowerCase()} expenses.`}
         </p>
       )}
       {query && sections.length > 0 && (
