@@ -2621,11 +2621,6 @@ a.group-strip:hover {
   width: 100%;
 }
 @media (max-width: 959px) {
-  .review-image.is-strip {
-    position: sticky;
-    top: calc(var(--appbar-h) + env(safe-area-inset-top) + 46px);
-    z-index: 6;
-  }
   .review-image.is-strip .card {
     padding: 8px 10px;
   }
@@ -2863,4 +2858,24 @@ a.group-strip:hover {
 .learn-more p {
   margin: 6px 0 0;
   color: var(--muted);
+}
+
+.adj-row > .adj-rate {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.adj-rate .num-input input {
+  width: 64px;
+}
+
+.conf-help {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+.conf-help li + li {
+  margin-top: 4px;
 }

@@ -9,7 +9,7 @@ import { formatINR } from '../../lib/money';
 import { checkTotals, LOW_CONFIDENCE } from '../../lib/receiptParser';
 import { signedAdjustment } from '../../lib/split';
 import type { AdjustmentKind } from '../../lib/types';
-import { newAdjustment, newItem, type Draft, type DraftAdjustment, type DraftItem } from './draft';
+import { newAdjustment, newItem, rateBase, type Draft, type DraftAdjustment, type DraftItem } from './draft';
 import type { ScanImage } from './ScanFlow';
 
 interface ReviewStepProps {
@@ -28,7 +28,8 @@ const KIND_LABEL: Record<AdjustmentKind, string> = { tax: 'Tax / GST', service: 
 
 export function ReviewStep({ draft, update, image, categorizing, canRescan, onRotate, onRetake, onManualFallback, onNext }: ReviewStepProps) {
   const [activeLine, setActiveLine] = useState<number | undefined>();
-  // Phones start with a compact, sticky strip so the fields to fix come first; desktop shows the photo beside the table.
+  // Phones start with a compact strip (in the page flow, not floating) so the fields to fix come first;
+  // desktop shows the photo beside the table.
   const [showImage, setShowImage] = useState(() => window.matchMedia?.('(min-width: 960px)').matches ?? true);
   const [zoomed, setZoomed] = useState(false);
   const [zoom, setZoom] = useState<1 | 2>(1);
@@ -67,6 +68,14 @@ export function ReviewStep({ draft, update, image, categorizing, canRescan, onRo
     }));
   const setAdj = (id: string, patch: Partial<DraftAdjustment>) => update((d) => ({ ...d, adjustments: d.adjustments.map((a) => (a.id === id ? { ...a, ...patch, low: undefined } : a)) }));
 
+  /** The user has checked the highlighted fields: drop every low-confidence flag at once. */
+  const clearFlags = () =>
+    update((d) => ({
+      ...d,
+      items: d.items.map((i) => (i.low ? { ...i, low: undefined } : i)),
+      adjustments: d.adjustments.map((a) => (a.low !== undefined ? { ...a, low: undefined } : a)),
+      totalLow: undefined,
+    }));
   const confirmComputed = () => update((d) => ({ ...d, printedTotalPaise: check.computedPaise, totalSource: 'confirmed', totalLow: undefined }));
   const addDifference = () =>
     update((d) => ({
@@ -84,7 +93,7 @@ export function ReviewStep({ draft, update, image, categorizing, canRescan, onRo
   const setGst = (rate: number) =>
     update((d) => ({
       ...d,
-      adjustments: [...d.adjustments.filter((a) => a.kind !== 'tax'), ...gstLines(gstBase, rate).map((l) => newAdjustment('tax', l.label, l.amountPaise))],
+      adjustments: [...d.adjustments.filter((a) => a.kind !== 'tax'), ...gstLines(gstBase, rate).map((l) => newAdjustment('tax', l.label, l.amountPaise, l.ratePercent))],
     }));
   // If the printed total minus everything except tax looks like a GST slab, offer it.
   const taxPaise = draft.adjustments.filter((a) => a.kind === 'tax').reduce((sum, a) => sum + a.amountPaise, 0);
@@ -184,6 +193,22 @@ export function ReviewStep({ draft, update, image, categorizing, canRescan, onRo
         {lowCount > 0 && (
           <Banner tone="info">
             {lowCount} field{lowCount > 1 ? 's' : ''} highlighted in yellow {lowCount > 1 ? 'were' : 'was'} hard to read. Please double-check {lowCount > 1 ? 'them' : 'it'}.
+            <ul className="conf-help">
+              <li>
+                <strong>What the ? means:</strong> the scanner wasn't sure it read that field correctly. It's only a reminder — it never blocks you.
+              </li>
+              <li>
+                <strong>Correct?</strong> Leave it as it is. Nothing else is needed.
+              </li>
+              <li>
+                <strong>Wrong?</strong> Fix it by comparing with the photo — the ? disappears as soon as you edit the field.
+              </li>
+            </ul>
+            <div className="banner-actions">
+              <button type="button" className="btn btn-sm" onClick={clearFlags}>
+                <Icon name="check" size={16} /> Everything looks right — clear all ?
+              </button>
+            </div>
           </Banner>
         )}
 
@@ -291,11 +316,46 @@ export function ReviewStep({ draft, update, image, categorizing, canRescan, onRo
                   allowNegative={a.kind === 'other'}
                   label={`${a.label} amount`}
                   lowConfidence={a.low}
-                  onChange={(p) => setAdj(a.id, { amountPaise: a.kind === 'discount' ? -Math.abs(p ?? 0) : p ?? 0 })}
+                  // Typing an amount by hand makes it a fixed amount (no longer a % of the items).
+                  onChange={(p) => setAdj(a.id, { amountPaise: a.kind === 'discount' ? -Math.abs(p ?? 0) : p ?? 0, ratePercent: undefined })}
                 />
                 <button type="button" className="icon-btn" aria-label={`Delete ${a.label}`} onClick={() => update((d) => ({ ...d, adjustments: d.adjustments.filter((x) => x.id !== a.id) }))}>
                   <Icon name="trash" size={18} />
                 </button>
+                {a.kind !== 'discount' &&
+                  (a.ratePercent !== undefined ? (
+                    <div className="adj-rate small">
+                      <span className="num-input">
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          min={0}
+                          step="0.01"
+                          value={a.ratePercent}
+                          aria-label={`${a.label} rate in percent`}
+                          onChange={(e) => {
+                            const rate = Math.max(0, Number(e.target.value) || 0);
+                            // Keep a label like "CGST 2.5%" in step with the new rate.
+                            const label = /\d+(?:\.\d+)?\s*%/.test(a.label) ? a.label.replace(/\d+(?:\.\d+)?\s*%/, `${rate}%`) : a.label;
+                            setAdj(a.id, { ratePercent: rate, label });
+                          }}
+                        />
+                        <span className="num-suffix">%</span>
+                      </span>
+                      <span className="muted">of {formatINR(rateBase(draft))} items — updates automatically when you add, remove or edit items.</span>
+                    </div>
+                  ) : (
+                    a.kind !== 'other' &&
+                    rateBase(draft) > 0 && (
+                      <button
+                        type="button"
+                        className="link-btn adj-rate"
+                        onClick={() => setAdj(a.id, { ratePercent: Math.round((Math.abs(a.amountPaise) / rateBase(draft)) * 10000) / 100 })}
+                      >
+                        Keep this as a % of the items instead
+                      </button>
+                    )
+                  ))}
               </li>
             ))}
           </ul>

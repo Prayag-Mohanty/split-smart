@@ -56,6 +56,8 @@ export interface ParsedAdjustment {
   confidence: number;
   raw: string;
   line: number;
+  /** Set when only the rate was readable, so the amount was calculated from it. */
+  ratePercent?: number;
 }
 
 export interface ParsedReceipt {
@@ -451,7 +453,7 @@ export function parseReceipt(lines: readonly OcrLine[]): ParsedReceipt {
   if (rateOnlyTaxes.length > 0 && taxSummaries.length === 0 && !adjustments.some((a) => a.kind === 'tax')) {
     const base = subtotals.length ? subtotals[subtotals.length - 1].amount : items.reduce((s, i) => s + i.totalPaise, 0);
     for (const t of rateOnlyTaxes) {
-      adjustments.push({ label: `${t.label} (calculated)`, kind: 'tax', amountPaise: Math.round((base * t.rate) / 100), confidence: 0, raw: t.raw, index: t.index });
+      adjustments.push({ label: `${t.label} (calculated)`, kind: 'tax', amountPaise: Math.round((base * t.rate) / 100), confidence: 0, raw: t.raw, index: t.index, ratePercent: t.rate });
     }
   }
 

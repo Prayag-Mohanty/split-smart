@@ -81,10 +81,18 @@ export async function recognizeReceipt(image: HTMLCanvasElement | Blob, onProgre
     onProgress?.({ stage: 'Done', progress: 1 });
     return { lines, text: data.text, meanConfidence: data.confidence };
   } catch (err) {
+    // A failed worker/core/model download leaves a broken worker behind; start fresh next time.
+    void disposeOcr();
     if (!navigator.onLine) {
       throw new Error('You are offline and the OCR model has not been downloaded yet. Connect once to scan, or add items manually.');
     }
-    throw err instanceof Error ? err : new Error(String(err));
+    const message = err instanceof Error ? err.message : String(err);
+    if (/importScripts|failed to load|NetworkError|Failed to fetch|404/i.test(message)) {
+      throw new Error(
+        "Couldn't load the receipt reader. Check your connection and reload the page. If you opened an old link or a saved home-screen app, open the latest SplitSmart link instead. You can still add the items by hand.",
+      );
+    }
+    throw err instanceof Error ? err : new Error(message);
   } finally {
     progressListener = null;
   }

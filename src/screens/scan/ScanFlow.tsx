@@ -13,7 +13,7 @@ import { useGroup, useStore } from '../../store/useStore';
 import { NotFound } from '../NotFound';
 import { AssignStep } from './AssignStep';
 import { CaptureStep } from './CaptureStep';
-import { draftFromExpense, draftFromParsed, draftToExpense, emptyDraft, type Draft } from './draft';
+import { applyRates, draftFromExpense, draftFromParsed, draftToExpense, emptyDraft, type Draft } from './draft';
 import { ProcessingStep } from './ProcessingStep';
 import { ReviewStep } from './ReviewStep';
 import { SummaryStep } from './SummaryStep';
@@ -84,7 +84,8 @@ function Flow({ group, editing }: { group: Group; editing?: Extract<Group['expen
 
   const updateDraft = useCallback((fn: (d: Draft) => Draft) => {
     dirty.current = true;
-    setDraft(fn);
+    // Percentage tax lines follow the items: recalculate them after every edit.
+    setDraft((d) => applyRates(fn(d)));
   }, []);
 
   /** Load a file and show its preview (before any processing). */
