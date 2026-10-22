@@ -2879,3 +2879,22 @@ a.group-strip:hover {
 .conf-help li + li {
   margin-top: 4px;
 }
+
+.settled-fold {
+  text-align: center;
+  padding: 36px 16px;
+}
+.settled-fold-icon {
+  font-size: 44px;
+}
+.settled-fold-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 8px 0 4px;
+}
+.settled-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
