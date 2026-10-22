@@ -90,3 +90,36 @@ describe('CSV export', () => {
     expect(csv).toContain('Arjun,Riya,50.00');
   });
 });
+
+import { spendByCategory, spendOverTime } from '../src/lib/analytics';
+
+describe('analytics', () => {
+  it('splits itemized receipts by item category and reconciles with totals', () => {
+    const g: Group = {
+      ...group,
+      expenses: [
+        ...group.expenses,
+        {
+          id: 'e2',
+          kind: 'itemized',
+          description: 'DMart',
+          date: '2026-10-03',
+          payerId: 'b',
+          category: 'Groceries',
+          createdAt: 1,
+          items: [
+            { id: 'i1', name: 'Rice', qty: 1, unitPaise: 60000, totalPaise: 60000, category: 'Groceries', assignees: ['a'] },
+            { id: 'i2', name: 'Chips', qty: 1, unitPaise: 40000, totalPaise: 40000, category: 'Food', assignees: ['b'] },
+          ],
+          adjustments: [{ id: 't', label: 'GST', kind: 'tax', amountPaise: 10000 }],
+        },
+      ],
+    };
+    const c = spendByCategory(g);
+    expect(c.Groceries).toBe(66000);
+    expect(c.Food).toBe(44000);
+    expect(c.Utilities).toBe(10001);
+    const t = spendOverTime(g);
+    expect(t.map((x) => x.total)).toEqual([10001, 0, 110000]);
+  });
+});

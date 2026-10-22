@@ -28,10 +28,17 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // App shell is precached; the heavy ML runtime (ONNX wasm, classifier worker) is cached
+        // on first use instead, so installing the PWA never forces a 20 MB download.
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
-        // Heavy ML bundles are lazy chunks; precache them too so OCR works offline after first visit.
+        globIgnores: ['**/classifier.worker-*.js', '**/*.wasm'],
         maximumFileSizeToCacheInBytes: 30 * 1024 * 1024,
         runtimeCaching: [
+          {
+            urlPattern: ({ url, sameOrigin }) => sameOrigin && /\/assets\/.*\.(wasm|js|mjs)$/.test(url.pathname),
+            handler: 'CacheFirst',
+            options: { cacheName: 'app-lazy-assets', expiration: { maxEntries: 40 } },
+          },
           {
             // Tesseract worker/core/language data and ONNX runtime wasm come from jsDelivr / unpkg.
             urlPattern: /^https:\/\/(cdn\.jsdelivr\.net|unpkg\.com|tessdata\.projectnaptha\.com)\/.*/,
