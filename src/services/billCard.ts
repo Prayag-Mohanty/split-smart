@@ -12,7 +12,13 @@ export interface BillCardInput {
   date: string;
   groupName: string;
   total: Paise;
-  payer: Member;
+  /** "Riya" or "Riya ₹500 + Arjun ₹340". */
+  paidBy: string;
+  /** The payments that settle this bill (one row each, with a QR to pay the receiver). */
+  transfers: { from: Member; to: Member; amount: Paise }[];
+  /** What each payer paid. */
+  paid: Record<string, Paise>;
+  /** Everyone's share; `label` lists what they had. */
   shares: { member: Member; amount: Paise; label: string }[];
 }
 
@@ -43,9 +49,8 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 }
 
 export async function renderBillCard(input: BillCardInput): Promise<Blob> {
-  const debtors = input.shares.filter((s) => s.member.id !== input.payer.id && s.amount > 0);
-  const others = input.shares.filter((s) => !debtors.includes(s));
-  const H = 420 + debtors.length * ROW + others.length * 90 + 140;
+  const H = 420 + input.transfers.length * ROW + input.shares.length * 90 + 140;
+  const labelOf = new Map(input.shares.map((s) => [s.member.id, s.label]));
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
@@ -71,7 +76,7 @@ export async function renderBillCard(input: BillCardInput): Promise<Blob> {
   ctx.font = font(30, 500);
   ctx.fillStyle = '#ccfbf1';
   ctx.textAlign = 'right';
-  ctx.fillText(`${input.date} · paid by ${input.payer.name}`, W - PAD, 262);
+  ctx.fillText(fitText(ctx, `${input.date} · paid by ${input.paidBy}`, W - 2 * PAD - 420), W - PAD, 262);
   ctx.textAlign = 'left';
 
   let y = 360;
@@ -97,7 +102,9 @@ export async function renderBillCard(input: BillCardInput): Promise<Blob> {
     ctx.textBaseline = 'alphabetic';
   };
 
-  for (const s of debtors) {
+  for (const t of input.transfers) {
+    const s = { member: t.from, amount: t.amount, label: labelOf.get(t.from.id) ?? '' };
+    const payee = t.to;
     ctx.fillStyle = '#ffffff';
     roundRect(ctx, PAD - 16, y, W - 2 * PAD + 32, ROW - 20, 28);
     ctx.fill();
@@ -105,29 +112,31 @@ export async function renderBillCard(input: BillCardInput): Promise<Blob> {
     ctx.fillStyle = '#0f1720';
     ctx.font = font(40, 700);
     ctx.fillText(s.member.name, PAD + 110, y + 75);
-    const hasQr = !!input.payer.upiId;
+    const hasQr = !!payee.upiId;
     ctx.font = font(48, 800);
     const amountLeft = W - PAD - (hasQr ? 170 : 16) - ctx.measureText(formatINR(s.amount)).width;
     ctx.fillStyle = '#56616d';
     ctx.font = font(28, 400);
-    ctx.fillText(fitText(ctx, `pays ${input.payer.name} · ${s.label}`, amountLeft - (PAD + 110) - 24), PAD + 110, y + 118);
+    ctx.fillText(fitText(ctx, `pays ${payee.name}${s.label ? ` · ${s.label}` : ''}`, amountLeft - (PAD + 110) - 24), PAD + 110, y + 118);
     ctx.fillStyle = '#0f766e';
     ctx.font = font(48, 800);
     ctx.textAlign = 'right';
     ctx.fillText(formatINR(s.amount), W - PAD - (hasQr ? 170 : 16), y + 100);
     ctx.textAlign = 'left';
     if (hasQr) {
-      const link = buildUpiLink({ payeeVpa: input.payer.upiId!, payeeName: input.payer.name, amountPaise: s.amount, note: input.title });
+      const link = buildUpiLink({ payeeVpa: payee.upiId!, payeeName: payee.name, amountPaise: s.amount, note: input.title });
       const img = await loadImage(await qrDataUrl(link, 300));
       ctx.drawImage(img, W - PAD - 150, y + 10, 150, 150);
     }
     y += ROW;
   }
-  for (const s of others) {
+  // Everyone's share of the bill (and what payers put in).
+  for (const s of input.shares) {
     avatar(s.member, PAD + 30, y + 40, 26);
     ctx.fillStyle = '#0f1720';
     ctx.font = font(32, 600);
-    ctx.fillText(`${s.member.name}${s.member.id === input.payer.id ? ' (paid)' : ''}`, PAD + 76, y + 52);
+    const paid = input.paid[s.member.id];
+    ctx.fillText(`${s.member.name}${paid ? ` (paid ${formatINR(paid)})` : ''}`, PAD + 76, y + 52);
     ctx.textAlign = 'right';
     ctx.fillText(formatINR(s.amount), W - PAD, y + 52);
     ctx.textAlign = 'left';
@@ -137,7 +146,11 @@ export async function renderBillCard(input: BillCardInput): Promise<Blob> {
   ctx.fillStyle = '#56616d';
   ctx.font = font(26, 400);
   ctx.textAlign = 'center';
-  ctx.fillText(input.payer.upiId ? 'Scan your QR with any UPI app to pay.' : 'Shares include tax & charges, split by what each person had.', W / 2, H - 70);
+  ctx.fillText(
+    input.transfers.some((t) => t.to.upiId) ? 'Scan your QR with any UPI app to pay.' : 'Shares include tax & charges, split by what each person had.',
+    W / 2,
+    H - 70,
+  );
   ctx.fillText('Split with SplitSmart — receipts never leave your phone.', W / 2, H - 32);
 
   return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not draw the card'))), 'image/png'));

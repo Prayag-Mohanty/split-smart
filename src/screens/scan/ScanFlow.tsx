@@ -220,7 +220,11 @@ function Flow({ group, editing }: { group: Group; editing?: Extract<Group['expen
   };
 
   const save = () => {
-    const expense = draftToExpense(draft, editing?.createdAt);
+    const expense = draftToExpense(
+      draft,
+      editing?.createdAt,
+      group.members.map((m) => m.id),
+    );
     saveExpense(group.id, expense);
     dirty.current = false;
     const next = queueIndex + 1;

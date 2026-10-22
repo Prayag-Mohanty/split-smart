@@ -3,6 +3,7 @@
  * and to/from saved expenses. Kept separate from the components so it is easy to test.
  */
 import { percentOf } from '../../lib/gst';
+import { payerFields } from '../../lib/payers';
 import { uid } from '../../lib/ids';
 import { LOW_CONFIDENCE, type ParsedReceipt } from '../../lib/receiptParser';
 import type { Adjustment, Category, ItemizedExpense, ReceiptItem } from '../../lib/types';
@@ -24,6 +25,8 @@ export interface Draft {
   description: string;
   date: string;
   payerId: string;
+  /** Set when several people paid; amounts may not add up yet while the user types. */
+  payers?: Record<string, number>;
   category: Category;
   categoryLocked: boolean;
   items: DraftItem[];
@@ -134,6 +137,7 @@ export function draftFromExpense(e: ItemizedExpense): Draft {
     description: e.description,
     date: e.date,
     payerId: e.payerId,
+    payers: e.payers,
     category: e.category,
     categoryLocked: true,
     items: e.items.map((i) => ({ ...i })),
@@ -154,13 +158,13 @@ export function dominantCategory(items: readonly ReceiptItem[]): Category {
   return best;
 }
 
-export function draftToExpense(d: Draft, createdAt = Date.now()): ItemizedExpense {
+export function draftToExpense(d: Draft, createdAt = Date.now(), memberOrder: readonly string[] = []): ItemizedExpense {
   return {
     id: d.id,
     kind: 'itemized',
     description: d.description.trim() || 'Receipt',
     date: d.date,
-    payerId: d.payerId,
+    ...(d.payers ? payerFields(d.payers, memberOrder) : { payerId: d.payerId }),
     category: d.categoryLocked ? d.category : dominantCategory(d.items),
     createdAt,
     items: d.items.map(({ low: _l, line: _ln, ...rest }) => (void _l, void _ln, { ...rest, name: rest.name.trim() || 'Item' })),

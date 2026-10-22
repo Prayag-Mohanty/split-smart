@@ -2,8 +2,10 @@ import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } fro
 import { AnimatedAmount } from '../../components/AnimatedAmount';
 import { Avatar } from '../../components/Avatar';
 import { Icon } from '../../components/Icon';
+import { PayerPicker } from '../../components/PayerPicker';
 import { Banner } from '../../components/ui';
 import { formatINR } from '../../lib/money';
+import { validatePayers } from '../../lib/payers';
 import { computeItemizedSplit } from '../../lib/split';
 import type { Group } from '../../lib/types';
 import type { Draft } from './draft';
@@ -32,6 +34,7 @@ export function AssignStep({ group, draft, update, onBack, onNext }: AssignStepP
   const order = useMemo(() => group.members.map((m) => m.id), [group.members]);
   const split = useMemo(() => computeItemizedSplit(draft.items, draft.adjustments, order), [draft.items, draft.adjustments, order]);
   const unassignedIds = new Set(split.unassigned.map((i) => i.id));
+  const payersError = draft.payers ? validatePayers(split.billTotal, draft.payers) : null;
   const [drag, setDrag] = useState<DragState | null>(null);
   const [absorbed, setAbsorbed] = useState<string | null>(null);
   const pending = useRef<{ itemId: string; label: string; x: number; y: number; pointerId: number } | null>(null);
@@ -94,21 +97,14 @@ export function AssignStep({ group, draft, update, onBack, onNext }: AssignStepP
     <div className="stack-lg assign-step">
       <div className="card stack">
         <h2 className="card-title">Who paid the bill?</h2>
-        <div className="payer-picker" role="radiogroup" aria-label="Paid by">
-          {group.members.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              role="radio"
-              aria-checked={draft.payerId === m.id}
-              className={`payer${draft.payerId === m.id ? ' selected' : ''}`}
-              onClick={() => update((d) => ({ ...d, payerId: m.id }))}
-            >
-              <Avatar member={m} size="sm" />
-              {m.id === group.meId ? `${m.name} (you)` : m.name}
-            </button>
-          ))}
-        </div>
+        <PayerPicker
+          members={group.members}
+          meId={group.meId}
+          totalPaise={split.billTotal}
+          value={{ payerId: draft.payerId, payers: draft.payers }}
+          onChange={(v) => update((d) => ({ ...d, payerId: v.payerId, payers: v.payers }))}
+        />
+        {payersError && <Banner tone="warn">{payersError}</Banner>}
       </div>
 
       <div className="section-head">
@@ -229,7 +225,7 @@ export function AssignStep({ group, draft, update, onBack, onNext }: AssignStepP
         <button type="button" className="btn btn-lg" onClick={onBack}>
           <Icon name="back" /> Review
         </button>
-        <button type="button" className="btn btn-primary btn-lg" disabled={split.unassigned.length > 0 || !split.ok} onClick={onNext}>
+        <button type="button" className="btn btn-primary btn-lg" disabled={split.unassigned.length > 0 || !split.ok || !!payersError} onClick={onNext}>
           See split <Icon name="arrowRight" />
         </button>
       </div>

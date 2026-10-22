@@ -32,8 +32,3 @@ export function balancePhrase(group: Pick<Group, 'meId' | 'members'>, id: Member
 export function transferPhrase(group: Pick<Group, 'meId' | 'members'>, fromId: MemberId, toId: MemberId, amount: Paise): string {
   return `${personName(group, fromId)} → ${personName(group, toId)} ${formatINR(amount)}`;
 }
-
-/** "Riya paid" / "You paid". */
-export function paidPhrase(group: Pick<Group, 'meId' | 'members'>, id: MemberId): string {
-  return `${personName(group, id)} paid`;
-}

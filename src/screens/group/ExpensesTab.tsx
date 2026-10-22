@@ -3,7 +3,7 @@ import { Avatar } from '../../components/Avatar';
 import { Icon } from '../../components/Icon';
 import { CATEGORY_META, EmptyState } from '../../components/ui';
 import { formatINR } from '../../lib/money';
-import { paidPhrase } from '../../lib/people';
+import { paidByPhrase } from '../../lib/payers';
 import { matchesQuery } from '../../lib/search';
 import { suggestSettlements } from '../../lib/settle';
 import { expenseShares, expenseTotal } from '../../lib/split';
@@ -160,7 +160,7 @@ export function ExpensesTab({ group }: { group: Group }) {
                             {e.recurringId && <Icon name="repeat" size={14} className="muted inline-icon" title="Recurring" />}
                           </span>
                           <span className="row-sub">
-                            {payer && <Avatar member={payer} size="sm" />} {paidPhrase(group, e.payerId)} · split {n} way{n === 1 ? '' : 's'}
+                            {payer && <Avatar member={payer} size="sm" />} {paidByPhrase(group, e)} · split {n} way{n === 1 ? '' : 's'}
                             {n === 0 && <span className="error-text"> (needs fixing)</span>}
                           </span>
                         </span>
