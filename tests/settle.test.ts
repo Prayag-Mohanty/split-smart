@@ -39,9 +39,9 @@ describe('simplifyDebts', () => {
   });
 
   it('finds zero-sum sub-groups that greedy would miss', () => {
-    // Greedy pairs the biggest debtor with the biggest creditor and needs 4 payments here;
-    // the optimum splits {a,c} {b,d,e} for 3.
-    const balances = { a: 600, b: 500, c: -600, d: -300, e: -200 };
+    // Greedy (biggest debtor pays biggest creditor) needs 4 payments here;
+    // the optimum splits into {a,c,e} {b,d} for 3.
+    const balances = { a: 500, b: 400, c: -300, d: -400, e: -200 };
     const t = simplifyDebts(balances);
     expect(t.length).toBe(3);
     expect(Object.values(apply(balances, t)).every((v) => v === 0)).toBe(true);
