@@ -47,6 +47,7 @@ export function groupFromJson(text: string): Group {
     expenses,
     settlements: Array.isArray(group.settlements) ? group.settlements : [],
     recurring: Array.isArray(group.recurring) ? group.recurring : [],
+    ...(group.simplifyDebts === false ? { simplifyDebts: false } : {}),
   };
 }
 

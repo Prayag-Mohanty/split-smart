@@ -8,14 +8,20 @@ import { navigate } from '../../hooks/useHashRoute';
 import { AVATAR_COLORS } from '../../lib/ids';
 import { formatINR } from '../../lib/money';
 import type { Group, Member } from '../../lib/types';
+import { describeDefault, initialSplit } from '../../lib/defaultSplit';
+import type { SplitSpec } from '../../lib/types';
 import { isValidVpa } from '../../lib/upi';
+import { SplitEditor } from '../../components/SplitEditor';
 import { memberInUse, useStore } from '../../store/useStore';
 import { ExportActions } from './ExportActions';
 
 const MEMBER_EMOJIS = ['', '😎', '🦁', '🐼', '🦊', '🐯', '🐸', '🐵', '🦄', '🐙', '🌟', '⚡'];
 
 export function SettingsTab({ group }: { group: Group }) {
-  const { renameGroup, deleteGroup, addMember, removeMember, saveRecurring, deleteRecurring, settings, updateSettings, setMe } = useStore();
+  const { renameGroup, deleteGroup, addMember, removeMember, saveRecurring, deleteRecurring, settings, updateSettings, setMe, setSimplifyDebts } = useStore();
+  const [editingDefault, setEditingDefault] = useState(false);
+  const savedDefault = settings.defaultSplits?.[group.id];
+  const simplify = group.simplifyDebts !== false;
   const [name, setName] = useState(group.name);
   const [newName, setNewName] = useState('');
   const [editing, setEditing] = useState<Member | null>(null);
@@ -141,6 +147,43 @@ export function SettingsTab({ group }: { group: Group }) {
         )}
       </section>
 
+      <section className="card stack" aria-labelledby="adv-h">
+        <h2 id="adv-h" className="card-title">
+          Advanced settings
+        </h2>
+        <div className="setting-row">
+          <Icon name="merge" className="muted setting-icon" />
+          <div className="grow">
+            <label className="row-title" htmlFor="simplify-switch">
+              Simplify group debts
+            </label>
+            <p className="small muted setting-desc">Automatically combines debts to reduce the total number of repayments between group members.</p>
+            <details className="small learn-more">
+              <summary>Learn more</summary>
+              <p>
+                With simplification on, SplitSmart looks only at what each person is owed or owes overall and finds the fewest payments that settle everyone — e.g. if Arjun owes Riya ₹200 and Meera owes Arjun ₹200, Meera just pays Riya ₹200. Nobody pays or receives a rupee more than their balance; only who-pays-whom changes.
+              </p>
+              <p>Turn it off if your group prefers to repay each debt to the person who actually paid, even if that takes more payments. This setting applies to the whole group.</p>
+            </details>
+          </div>
+          <span className="switch">
+            <input id="simplify-switch" type="checkbox" checked={simplify} onChange={(e) => setSimplifyDebts(group.id, e.target.checked)} />
+            <span />
+          </span>
+        </div>
+        <div className="setting-row">
+          <Icon name="scale" className="muted setting-icon" />
+          <div className="grow">
+            <span className="row-title">Default split</span>
+            <p className="small setting-desc">{describeDefault(group, savedDefault)}</p>
+            <p className="small muted setting-desc">New expenses you add to this group will default to this setting, which is personal, not group-wide.</p>
+          </div>
+          <button type="button" className="btn btn-sm" onClick={() => setEditingDefault(true)} disabled={group.members.length === 0}>
+            <Icon name="edit" size={16} /> Change
+          </button>
+        </div>
+      </section>
+
       <section className="card stack" aria-labelledby="pref-h">
         <h2 id="pref-h" className="card-title">
           Preferences
@@ -169,6 +212,7 @@ export function SettingsTab({ group }: { group: Group }) {
       </section>
 
       <MemberModal group={group} member={editing} onClose={() => setEditing(null)} />
+      {editingDefault && <DefaultSplitModal group={group} onClose={() => setEditingDefault(false)} />}
       <Modal
         open={confirmDelete}
         title="Delete this group?"
@@ -268,3 +312,73 @@ function MemberModal({ group, member, onClose }: { group: Group; member: Member 
     </Modal>
   );
 }
+
+/** Edit your personal default (payer + split) for new expenses in this group. */
+function DefaultSplitModal({ group, onClose }: { group: Group; onClose: () => void }) {
+  const saved = useStore((s) => s.settings.defaultSplits?.[group.id]);
+  const setDefaultSplit = useStore((s) => s.setDefaultSplit);
+  const start = initialSplit(group, saved);
+  const [payerId, setPayerId] = useState(start.payerId);
+  const [split, setSplit] = useState<SplitSpec>(start.split);
+  const valid = split.participants.length > 0 && (split.mode !== 'percent' || Math.abs(split.participants.reduce((s, id) => s + (split.values[id] ?? 0), 0) - 100) < 1e-6);
+
+  return (
+    <Modal
+      open
+      title="Default split"
+      onClose={onClose}
+      footer={
+        <>
+          {saved && (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => {
+                setDefaultSplit(group.id, undefined);
+                toast('Default reset to “paid by you, split equally”');
+                onClose();
+              }}
+            >
+              Reset
+            </button>
+          )}
+          <button type="button" className="btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={!valid}
+            onClick={() => {
+              setDefaultSplit(group.id, { payerId, split });
+              toast('Default split saved');
+              onClose();
+            }}
+          >
+            Save
+          </button>
+        </>
+      }
+    >
+      <div className="form">
+        <fieldset className="field">
+          <legend>Paid by</legend>
+          <div className="payer-picker" role="radiogroup" aria-label="Default payer">
+            {group.members.map((m) => (
+              <button key={m.id} type="button" role="radio" aria-checked={payerId === m.id} className={`payer${payerId === m.id ? ' selected' : ''}`} onClick={() => setPayerId(m.id)}>
+                <Avatar member={m} size="sm" />
+                {m.id === group.meId ? `${m.name} (you)` : m.name}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+        <div className="field">
+          <span>Split</span>
+          <SplitEditor members={group.members} totalPaise={10000} value={split} onChange={setSplit} modes={['equal', 'percent', 'shares']} />
+          <small className="muted">Preview shown for a ₹100 bill. Exact amounts depend on the bill, so they're set per expense.</small>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+

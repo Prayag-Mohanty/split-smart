@@ -9,7 +9,7 @@ import { Amount, Banner, EmptyState } from '../../components/ui';
 import { todayIso } from '../../lib/ids';
 import { formatINR } from '../../lib/money';
 import { balanceVerb, isMe, personName } from '../../lib/people';
-import { computeMemberStats, rawDebts, suggestSettlements, type Transfer } from '../../lib/settle';
+import { computeMemberStats, rawDebts, simplifyDebts, computeNetBalances, suggestSettlements, type Transfer } from '../../lib/settle';
 import type { Group, Member } from '../../lib/types';
 import { buildUpiLink, isValidVpa } from '../../lib/upi';
 import { qrDataUrl } from '../../services/qr';
@@ -41,6 +41,13 @@ export function BalancesTab({ group }: { group: Group }) {
   const [paying, setPaying] = useState<Transfer | null>(null);
   const [celebrate, setCelebrate] = useState(false);
   const settle = useSettle(group);
+  const simplifying = group.simplifyDebts !== false;
+  const setSimplifyDebts = useStore((s) => s.setSimplifyDebts);
+  // How many payments simplification would need, to show what turning it on saves.
+  const minimum = useMemo(
+    () => (simplifying ? transfers.length : simplifyDebts(computeNetBalances(group), group.members.map((m) => m.id)).length),
+    [group, simplifying, transfers.length],
+  );
 
   // Celebrate the moment the last balance is cleared (not on every visit to a settled group).
   const prevCount = useRef(transfers.length);
@@ -86,8 +93,20 @@ export function BalancesTab({ group }: { group: Group }) {
             Suggested payments
           </h2>
           <p className="muted small">
-            {transfers.length} payment{transfers.length > 1 ? 's' : ''} settle{transfers.length === 1 ? 's' : ''} everything — the minimum possible for {nonZero} people with open balances.
+            {simplifying
+              ? `${transfers.length} payment${transfers.length > 1 ? 's' : ''} settle${transfers.length === 1 ? 's' : ''} everything — the minimum possible for ${nonZero} people with open balances.`
+              : `Simplify group debts is off, so each debt is repaid to the person who paid: ${transfers.length} payment${transfers.length > 1 ? 's' : ''}.`}
           </p>
+          {!simplifying && minimum < transfers.length && (
+            <Banner tone="info">
+              Turning on <strong>Simplify group debts</strong> would settle everything in {minimum} payment{minimum === 1 ? '' : 's'} instead of {transfers.length}.
+              <div className="banner-actions">
+                <button type="button" className="btn btn-sm btn-primary" onClick={() => setSimplifyDebts(group.id, true)}>
+                  Simplify debts
+                </button>
+              </div>
+            </Banner>
+          )}
           <ul className="stack">
             {transfers.map((t, i) => {
               const from = byId.get(t.fromId);

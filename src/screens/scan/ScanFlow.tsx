@@ -3,6 +3,7 @@ import { AppBar } from '../../components/AppBar';
 import { toast } from '../../components/Toast';
 import { navigate } from '../../hooks/useHashRoute';
 import { todayIso } from '../../lib/ids';
+import { initialSplit } from '../../lib/defaultSplit';
 import { parseReceipt, type OcrLine } from '../../lib/receiptParser';
 import type { Category, Group } from '../../lib/types';
 import { categorize } from '../../services/classifier';
@@ -59,7 +60,8 @@ function Flow({ group, editing }: { group: Group; editing?: Extract<Group['expen
   const [image, setImage] = useState<ScanImage | null>(null);
   const [progress, setProgress] = useState<OcrProgress>({ stage: 'Preparing', progress: 0 });
   const [error, setError] = useState('');
-  const [draft, setDraft] = useState<Draft>(() => (editing ? draftFromExpense(editing) : emptyDraft(group.meId ?? group.members[0].id, todayIso())));
+  const defaultPayer = useStore((s) => initialSplit(group, s.settings.defaultSplits?.[group.id]).payerId);
+  const [draft, setDraft] = useState<Draft>(() => (editing ? draftFromExpense(editing) : emptyDraft(defaultPayer, todayIso())));
   const [categorizing, setCategorizing] = useState(false);
   const runId = useRef(0);
   const dirty = useRef(false);

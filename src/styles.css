@@ -2389,6 +2389,8 @@ a.group-strip:hover {
 .split-layout {
   display: grid;
   gap: 20px;
+  /* minmax(0, …) stops the horizontally scrolling category chips from widening the column on phones. */
+  grid-template-columns: minmax(0, 1fr);
 }
 @media (min-width: 960px) {
   .split-layout {
@@ -2811,4 +2813,54 @@ a.group-strip:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.search-box > svg {
+  position: absolute;
+  left: 12px;
+  pointer-events: none;
+}
+.search-box .input {
+  padding-left: 38px;
+  padding-right: 40px;
+  border-radius: 999px;
+}
+.search-box .icon-btn {
+  position: absolute;
+  right: 2px;
+}
+.search-box input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.setting-row {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 6px 0;
+}
+.setting-row + .setting-row {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+.setting-icon {
+  flex: none;
+  margin-top: 2px;
+}
+.setting-desc {
+  margin: 4px 0 0;
+}
+.learn-more summary {
+  color: var(--brand);
+  margin-top: 6px;
+}
+.learn-more p {
+  margin: 6px 0 0;
+  color: var(--muted);
 }

@@ -126,4 +126,15 @@ export interface Group {
   recurring: RecurringExpense[];
   /** Which member is the person using this device ("You"). Unset for imported groups until chosen. */
   meId?: MemberId;
+  /**
+   * Combine debts into the fewest payments (default true). When false, everyone settles
+   * each person-to-person debt directly, as it arose.
+   */
+  simplifyDebts?: boolean;
+}
+
+/** A personal (per-device) default for new expenses in a group. Never exported with the group. */
+export interface DefaultSplit {
+  payerId?: MemberId;
+  split: SplitSpec;
 }

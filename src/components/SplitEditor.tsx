@@ -33,10 +33,12 @@ interface SplitEditorProps {
   totalPaise: number;
   value: SplitSpec;
   onChange: (spec: SplitSpec) => void;
+  /** Restrict the available modes (e.g. no "exact" for a default split with no amount yet). */
+  modes?: SplitMode[];
 }
 
 /** Choose a split mode and enter per-person values, with a live preview of every share. */
-export function SplitEditor({ members, totalPaise, value, onChange }: SplitEditorProps) {
+export function SplitEditor({ members, totalPaise, value, onChange, modes }: SplitEditorProps) {
   const result = useMemo(() => computeSplit(totalPaise, value), [totalPaise, value]);
   const { mode, participants, values } = value;
 
@@ -53,7 +55,7 @@ export function SplitEditor({ members, totalPaise, value, onChange }: SplitEdito
   return (
     <div className="split-editor">
       <div className="segmented" role="radiogroup" aria-label="Split mode">
-        {MODES.map((m) => (
+        {MODES.filter((m) => !modes || modes.includes(m.id)).map((m) => (
           <button key={m.id} type="button" role="radio" aria-checked={mode === m.id} className={mode === m.id ? 'active' : ''} onClick={() => setMode(m.id)}>
             {m.label}
           </button>

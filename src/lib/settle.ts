@@ -163,8 +163,12 @@ function greedySettle(ids: readonly MemberId[], balances: Record<MemberId, Paise
   return out;
 }
 
-/** Suggested payments for a whole group. */
+/**
+ * Suggested payments for a whole group: the minimum set when the group simplifies debts
+ * (the default), otherwise every person-to-person debt as it arose.
+ */
 export function suggestSettlements(group: Group): Transfer[] {
+  if (group.simplifyDebts === false) return rawDebts(group);
   return simplifyDebts(computeNetBalances(group), group.members.map((m) => m.id));
 }
 

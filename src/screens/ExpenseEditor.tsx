@@ -9,6 +9,7 @@ import { Banner, CategorySelect } from '../components/ui';
 import { useClassifierStatus } from '../hooks/useCategorizer';
 import { navigate } from '../hooks/useHashRoute';
 import { todayIso, uid } from '../lib/ids';
+import { initialSplit } from '../lib/defaultSplit';
 import { nextOccurrence } from '../lib/recurring';
 import { validateSplit } from '../lib/split';
 import type { Category, ManualExpense, RecurrenceFrequency, SplitSpec } from '../lib/types';
@@ -28,16 +29,18 @@ export default function ExpenseEditor({ groupId, expenseId }: { groupId: string;
 function Editor({ groupId, existing }: { groupId: string; existing?: ManualExpense }) {
   const group = useGroup(groupId)!;
   const { saveExpense, deleteExpense, saveRecurring, settings } = useStore();
-  const allIds = useMemo(() => group.members.map((m) => m.id), [group.members]);
+  // New expenses start from your saved default split for this group (paid by you, equal by default).
+  const savedDefault = useStore((s) => s.settings.defaultSplits?.[groupId]);
+  const start = useMemo(() => initialSplit(group, savedDefault), [group, savedDefault]);
 
   const [description, setDescription] = useState(existing?.description ?? '');
   const [total, setTotal] = useState<number | undefined>(existing?.totalPaise);
-  const [payerId, setPayerId] = useState(existing?.payerId ?? group.meId ?? group.members[0]?.id ?? '');
+  const [payerId, setPayerId] = useState(existing?.payerId ?? start.payerId);
   const [date, setDate] = useState(existing?.date ?? todayIso());
   const [category, setCategory] = useState<Category>(existing?.category ?? 'Other');
   const [categoryTouched, setCategoryTouched] = useState(!!existing);
   const [suggesting, setSuggesting] = useState(false);
-  const [split, setSplit] = useState<SplitSpec>(existing?.split ?? { mode: 'equal', participants: allIds, values: {} });
+  const [split, setSplit] = useState<SplitSpec>(existing?.split ?? start.split);
   const [repeat, setRepeat] = useState<RecurrenceFrequency | ''>('');
   const [submitted, setSubmitted] = useState(false);
   const { status, progress } = useClassifierStatus();

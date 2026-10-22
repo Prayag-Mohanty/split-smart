@@ -7,12 +7,14 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { AVATAR_COLORS, todayIso, uid } from '../lib/ids';
 import { materialiseRecurring } from '../lib/recurring';
-import type { Expense, Group, Member, RecurringExpense, Settlement } from '../lib/types';
+import type { DefaultSplit, Expense, Group, Member, RecurringExpense, Settlement } from '../lib/types';
 
 export interface Settings {
   autoCategorize: boolean;
   /** The user's own name, remembered so new groups can add "you" automatically. */
   myName?: string;
+  /** Personal default split per group id (lives on this device only, never exported). */
+  defaultSplits?: Record<string, DefaultSplit>;
 }
 
 interface State {
@@ -22,6 +24,9 @@ interface State {
   /** `myName` (if given) becomes the first member and is marked as "you". */
   createGroup: (name: string, memberNames?: string[], emoji?: string, myName?: string) => string;
   setMe: (groupId: string, memberId: string | undefined) => void;
+  setSimplifyDebts: (groupId: string, on: boolean) => void;
+  /** Save (or with `undefined`, reset) your default split for new expenses in a group. */
+  setDefaultSplit: (groupId: string, value: DefaultSplit | undefined) => void;
   renameGroup: (groupId: string, name: string, emoji?: string) => void;
   deleteGroup: (groupId: string) => void;
   /** Import a copy. `keepMe` keeps the group's "you" (used for the bundled demo). */
@@ -88,6 +93,14 @@ export const useStore = create<State>()(
       renameGroup: (groupId, name, emoji) =>
         set((s) => ({ groups: updateGroup(s.groups, groupId, (g) => ({ ...g, name: name.trim() || g.name, emoji })) })),
       deleteGroup: (groupId) => set((s) => ({ groups: s.groups.filter((g) => g.id !== groupId) })),
+      setSimplifyDebts: (groupId, on) => set((s) => ({ groups: updateGroup(s.groups, groupId, (g) => ({ ...g, simplifyDebts: on })) })),
+      setDefaultSplit: (groupId, value) =>
+        set((s) => {
+          const defaultSplits = { ...(s.settings.defaultSplits ?? {}) };
+          if (value) defaultSplits[groupId] = value;
+          else delete defaultSplits[groupId];
+          return { settings: { ...s.settings, defaultSplits } };
+        }),
       setMe: (groupId, memberId) => set((s) => ({ groups: updateGroup(s.groups, groupId, (g) => ({ ...g, meId: memberId })) })),
       importGroup: (group, opts) => {
         // Always import as a new group so an import can never clobber local data.
