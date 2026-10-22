@@ -101,3 +101,33 @@ describe('default split', () => {
     expect(initialSplit(base, { split: { mode: 'equal', participants: ['x'], values: {} } }).split.participants).toEqual(['r', 'a', 'm']);
   });
 });
+
+import { applyRates, rateBase } from '../src/screens/scan/draft';
+import type { Adjustment, ReceiptItem } from '../src/lib/types';
+
+describe('percentage tax lines', () => {
+  const item = (id: string, totalPaise: number): ReceiptItem => ({ id, name: id, qty: 1, unitPaise: totalPaise, totalPaise, category: 'Food', assignees: [] });
+  const gst = (rate: number, amountPaise = 0): Adjustment => ({ id: `t${rate}`, label: `GST ${rate}%`, kind: 'tax', amountPaise, ratePercent: rate });
+
+  it('recalculates CGST/SGST when items are added, edited or removed', () => {
+    let d = applyRates({ items: [item('a', 237000)], adjustments: [gst(2.5), { ...gst(2.5), id: 's' }] });
+    expect(d.adjustments.map((a) => a.amountPaise)).toEqual([5925, 5925]);
+    d = applyRates({ ...d, items: [...d.items, item('b', 10000)] });
+    expect(d.adjustments.map((a) => a.amountPaise)).toEqual([6175, 6175]);
+    d = applyRates({ ...d, items: [item('b', 10000)] });
+    expect(d.adjustments.map((a) => a.amountPaise)).toEqual([250, 250]);
+  });
+
+  it('charges the rate after discounts and leaves fixed lines alone', () => {
+    const fixed: Adjustment = { id: 'f', label: 'Packing', kind: 'other', amountPaise: 2000 };
+    const discount: Adjustment = { id: 'd', label: 'Discount', kind: 'discount', amountPaise: -10000 };
+    const d = applyRates({ items: [item('a', 110000)], adjustments: [discount, gst(5), fixed] });
+    expect(rateBase(d)).toBe(100000);
+    expect(d.adjustments.map((a) => a.amountPaise)).toEqual([-10000, 5000, 2000]);
+  });
+
+  it('returns the same object when nothing changes', () => {
+    const d = { items: [item('a', 10000)], adjustments: [gst(5, 500)] };
+    expect(applyRates(d)).toBe(d);
+  });
+});

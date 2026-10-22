@@ -13,13 +13,13 @@ export function percentOf(base: Paise, percent: number): Paise {
 }
 
 /** CGST + SGST lines for a total GST rate on `base` (5 → two 2.5% lines). */
-export function gstLines(base: Paise, totalRate: number): { label: string; amountPaise: Paise }[] {
+export function gstLines(base: Paise, totalRate: number): { label: string; amountPaise: Paise; ratePercent: number }[] {
   const half = totalRate / 2;
   const each = percentOf(base, half);
   const pct = `${Number.isInteger(half) ? half : half.toFixed(1)}%`;
   return [
-    { label: `CGST ${pct}`, amountPaise: each },
-    { label: `SGST ${pct}`, amountPaise: each },
+    { label: `CGST ${pct}`, amountPaise: each, ratePercent: half },
+    { label: `SGST ${pct}`, amountPaise: each, ratePercent: half },
   ];
 }
 

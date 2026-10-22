@@ -129,8 +129,8 @@ import { gstLines, guessGstRate } from '../src/lib/gst';
 describe('GST helpers', () => {
   it('splits a rate into equal CGST and SGST lines on the subtotal', () => {
     expect(gstLines(237000, 5)).toEqual([
-      { label: 'CGST 2.5%', amountPaise: 5925 },
-      { label: 'SGST 2.5%', amountPaise: 5925 },
+      { label: 'CGST 2.5%', amountPaise: 5925, ratePercent: 2.5 },
+      { label: 'SGST 2.5%', amountPaise: 5925, ratePercent: 2.5 },
     ]);
     expect(gstLines(10000, 18)[0].label).toBe('CGST 9%');
   });

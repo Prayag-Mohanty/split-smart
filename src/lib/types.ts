@@ -59,6 +59,11 @@ export interface Adjustment {
   label: string;
   kind: AdjustmentKind;
   amountPaise: Paise;
+  /**
+   * Set for percentage lines (e.g. CGST 2.5%): the amount is recalculated from the items
+   * (after discounts) whenever they change. Typing an amount by hand clears it.
+   */
+  ratePercent?: number;
 }
 
 interface ExpenseBase {
