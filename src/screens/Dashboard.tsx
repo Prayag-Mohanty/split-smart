@@ -4,7 +4,7 @@ import { AvatarStack } from '../components/Avatar';
 import { Icon } from '../components/Icon';
 import { Modal } from '../components/Modal';
 import { toast } from '../components/Toast';
-import { Amount, EmptyState } from '../components/ui';
+import { Avatar } from '../components/Avatar';
 import { navigate } from '../hooks/useHashRoute';
 import { demoGroup } from '../lib/demo';
 import { formatINR } from '../lib/money';
@@ -48,11 +48,11 @@ export function Dashboard() {
           <section className="hero" aria-label="Totals across all groups">
             <div>
               <span className="hero-label">Total spent</span>
-              <strong className="hero-value">{formatINR(totalSpend)}</strong>
+              <strong className="hero-value">{formatINR(totalSpend, { compact: true })}</strong>
             </div>
             <div>
               <span className="hero-label">Waiting to be settled</span>
-              <strong className="hero-value">{formatINR(totalOutstanding)}</strong>
+              <strong className="hero-value">{formatINR(totalOutstanding, { compact: true })}</strong>
             </div>
             <div>
               <span className="hero-label">Groups</span>
@@ -61,37 +61,23 @@ export function Dashboard() {
           </section>
         )}
 
-        <div className="section-head">
-          <h2>Your groups</h2>
-          <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
-            <Icon name="plus" size={18} /> New group
-          </button>
-        </div>
+        {groups.length > 0 && (
+          <div className="section-head">
+            <h2>Your groups</h2>
+            <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
+              <Icon name="plus" size={18} /> New group
+            </button>
+          </div>
+        )}
 
         {groups.length === 0 ? (
-          <EmptyState
-            icon="receipt"
-            title="Split your first bill"
-            action={
-              <div className="row-wrap center">
-                <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
-                  <Icon name="plus" size={18} /> Create a group
-                </button>
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => {
-                    const id = importGroup(demoGroup());
-                    navigate(`/g/${id}`);
-                  }}
-                >
-                  <Icon name="sparkle" size={18} /> Try a demo group
-                </button>
-              </div>
-            }
-          >
-            Create a group for your wing, room or trip, add friends, then scan a receipt. Everything stays on this device.
-          </EmptyState>
+          <Welcome
+            onDemo={() => {
+              const id = importGroup(demoGroup(), { keepMe: true });
+              navigate(`/g/${id}`);
+            }}
+            onCreate={() => setCreating(true)}
+          />
         ) : (
           <ul className="group-grid">
             {summaries.map(({ g, spend, outstanding, last }) => (
@@ -115,7 +101,7 @@ export function Dashboard() {
                     <div className="group-card-stats">
                       <span>
                         <span className="muted small">Spent </span>
-                        <Amount paise={spend} />
+                        <strong className="amount">{formatINR(spend, { compact: true })}</strong>
                       </span>
                       <span className={outstanding ? 'pill pill-warn' : 'pill pill-ok'}>
                         {outstanding ? `${formatINR(outstanding)} to settle` : 'All settled'}
@@ -139,10 +125,80 @@ export function Dashboard() {
   );
 }
 
+/** First-run hero: says what the app does in five seconds and leads with the demo. */
+function Welcome({ onDemo, onCreate }: { onDemo: () => void; onCreate: () => void }) {
+  const people = [
+    { name: 'Riya', color: '#0f766e' },
+    { name: 'Arjun', color: '#7c3aed' },
+    { name: 'Meera', color: '#c2410c' },
+  ];
+  return (
+    <section className="welcome" aria-labelledby="welcome-title">
+      <div className="welcome-copy">
+        <p className="eyebrow">Scan. Split. Settle.</p>
+        <h2 id="welcome-title" className="welcome-title">
+          Split the bill by what people actually ate.
+        </h2>
+        <p className="welcome-sub">GST shared fairly. Fewest payments. Nothing leaves your phone.</p>
+        <div className="welcome-actions">
+          <button type="button" className="btn btn-primary btn-lg" onClick={onDemo}>
+            <Icon name="sparkle" /> Try a demo group
+          </button>
+          <button type="button" className="btn btn-lg" onClick={onCreate}>
+            <Icon name="plus" /> Create a group
+          </button>
+        </div>
+        <h3 className="welcome-first">Split your first bill</h3>
+        <p className="muted small">Create a group for your wing, room or trip, add friends, then scan a receipt. Everything stays on this device.</p>
+      </div>
+
+      <ol className="welcome-steps" aria-label="How it works">
+        <li className="wstep">
+          <div className="wstep-visual mini-receipt" aria-hidden="true">
+            <span>Large Pizza</span>
+            <b>400</b>
+            <span>Maggi ×3</span>
+            <b>180</b>
+            <span>Cold Coffee</span>
+            <b>220</b>
+            <span className="mini-gst">GST 5%</span>
+            <b className="mini-gst">40</b>
+          </div>
+          <strong>1. Snap the bill</strong>
+          <span className="muted small">Text is read on your phone.</span>
+        </li>
+        <li className="wstep">
+          <div className="wstep-visual" aria-hidden="true">
+            <div className="mini-assign">
+              {people.map((p) => (
+                <Avatar key={p.name} member={p} />
+              ))}
+            </div>
+          </div>
+          <strong>2. Tap who ate what</strong>
+          <span className="muted small">Tax splits in proportion.</span>
+        </li>
+        <li className="wstep">
+          <div className="wstep-visual" aria-hidden="true">
+            <div className="mini-settle">
+              <Icon name="check" size={28} />
+              <span>₹336 → Riya</span>
+            </div>
+          </div>
+          <strong>3. Settle up</strong>
+          <span className="muted small">Fewest payments, UPI ready.</span>
+        </li>
+      </ol>
+    </section>
+  );
+}
+
 function CreateGroupModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const createGroup = useStore((s) => s.createGroup);
+  const rememberedName = useStore((s) => s.settings.myName ?? '');
   const [name, setName] = useState('');
   const [emoji, setEmoji] = useState(GROUP_EMOJIS[0]);
+  const [myName, setMyName] = useState(rememberedName);
   const [members, setMembers] = useState<string[]>([]);
   const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -157,7 +213,7 @@ function CreateGroupModal({ open, onClose }: { open: boolean; onClose: () => voi
   const submit = () => {
     if (!name.trim()) return;
     const all = [...members, ...draft.split(',').map((n) => n.trim()).filter(Boolean)];
-    const id = createGroup(name, all, emoji);
+    const id = createGroup(name, all, emoji, myName);
     setName('');
     setMembers([]);
     setDraft('');
@@ -203,8 +259,13 @@ function CreateGroupModal({ open, onClose }: { open: boolean; onClose: () => voi
             ))}
           </div>
         </fieldset>
+        <label className="field">
+          <span>Your name</span>
+          <input className="input" value={myName} onChange={(e) => setMyName(e.target.value)} placeholder="e.g. Riya" maxLength={40} autoComplete="given-name" />
+          <small className="muted">You'll show up as “You” in this group. Remembered for next time.</small>
+        </label>
         <div className="field">
-          <label htmlFor="member-draft">Members</label>
+          <label htmlFor="member-draft">Who else? (Members)</label>
           <div className="row">
             <input
               id="member-draft"
@@ -218,7 +279,8 @@ function CreateGroupModal({ open, onClose }: { open: boolean; onClose: () => voi
                   addDraft();
                 }
               }}
-              placeholder="Name, then Enter (or comma separated)"
+              placeholder="Arjun, Meera, Kabir"
+              aria-describedby="member-hint"
             />
             <button type="button" className="btn" onClick={addDraft} disabled={!draft.trim()}>
               Add
@@ -226,6 +288,7 @@ function CreateGroupModal({ open, onClose }: { open: boolean; onClose: () => voi
           </div>
           {members.length > 0 && (
             <ul className="chips" aria-label="Members to add">
+              {myName.trim() && <li className="chip chip-me">{myName.trim()} (you)</li>}
               {members.map((m) => (
                 <li key={m} className="chip">
                   {m}
@@ -236,7 +299,9 @@ function CreateGroupModal({ open, onClose }: { open: boolean; onClose: () => voi
               ))}
             </ul>
           )}
-          <small className="muted">Include yourself. You can add more people later.</small>
+          <small id="member-hint" className="muted">
+            Name, then Enter (or comma separated). {myName.trim() ? 'You are added automatically.' : 'Include yourself.'} You can add more people later.
+          </small>
         </div>
       </form>
     </Modal>

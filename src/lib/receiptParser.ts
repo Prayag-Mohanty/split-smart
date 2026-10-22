@@ -76,7 +76,7 @@ export const LOW_CONFIDENCE = 70;
 const MAX_LINE_AMOUNT = 10_00_000_00; // ₹10 lakh — anything above on a single line is almost certainly noise
 
 const NOISE =
-  /gstin|gst\s*(no|number|reg|in\b|#)|fssai|\bhsn\b|\bsac\b|\bcin\b|\bpan\b|phone|\bph\b|\bmob|\btel\b|contact|whats?app|invoice|bill\s*(no|#|num)|receipt\s*(no|#)|\bkot\b|token|order\s*(no|id|#|type)|table|\bpax\b|guests?|date|time|cashier|server|steward|waiter|captain|operator|thank|visit|again|www|http|\.com|e-?mail|[\w.]+@[\w-]+\.\w|address|road|\bst\.|street|nagar|pin\s*code|\bpin\b|near\b|opp\b|\btxn|\bref\b|\bcard|\bcash\b|\bupi\b|paytm|gpay|phonepe|change\b|tender|received|balance|total\s*(items?|qty|quantity)|no\.?\s*of\s*items|\bitems?\s*:|e\.?\s*&\s*o\.?\s*e|subject\s*to|jurisdiction|powered\s*by|customer|\bname\s*:|\bmode\b|counter/i;
+  /gstin|gst\s*(no|number|reg|in\b|#)|fssai|\bhsn\b|\bsac\b|\bcin\b|\bpan\b|phone|\bph\b|\bmob|\btel\b|contact|whats?app|invoice|bill\s*(no|#|num)|receipt\s*(no|#)|\bkot\b|token|order\s*(no|id|#|type)|table|\bpax\b|guests?|date|time|cashier|server|steward|waiter|captain|operator|thank|visit|again|www|http|\.com|e-?mail|[\w.]+@[\w-]+\.\w|address|road|\bst\.|street|nagar|pin\s*code|\bpin\b|near\b|opp\b|\btxn|\bref\b|\bcard|\bcash\b|\bupi\b|paytm|gpay|phonepe|change\b|tender|received|balance|total\s*(items?|qty|quantity)|no\.?\s*of\s*items|\bitems?\W*\d+\W*qty|\bitems?\s*:|e\.?\s*&\s*o\.?\s*e|subject\s*to|jurisdiction|powered\s*by|customer|\bname\s*:|\bmode\b|counter/i;
 const SUBTOTAL = /sub\s*-?\s*tot|item\s*tot|food\s*tot|gross\s*(amount|amt|total)|total\s*before|taxable\s*(amount|amt|value)|basic\s*amount/i;
 const TOTAL_STRONG = /grand\s*-?\s*tot|net\s*(amt|amount|payable|total|bill|pay)|amount\s*(payable|due)|total\s*(payable|due)|to\s*pay|payable|bill\s*(amount|amt|total)/i;
 const TOTAL_WEAK = /\btot(al)?\b|\btotal|amount\s*$/i;
@@ -156,7 +156,8 @@ function splitLine(tokens: Token[]): SplitLine {
   while (end > 0) {
     const tok = tokens[end - 1];
     const t = tok.text;
-    if (/^(₹|rs\.?|inr|=|-|:|@|x|\/-)$/i.test(t)) {
+    // Currency marks, separators and OCR specks ("©", "|", "\\") between or after the numbers.
+    if (/^(₹|rs\.?|inr|x|\/-)$/i.test(t) || /^[^A-Za-z0-9₹]+$/.test(t)) {
       end--;
       continue;
     }
@@ -203,8 +204,20 @@ function detectDate(text: string): string | undefined {
 
 type Kind = 'noise' | 'subtotal' | 'total' | 'taxSummary' | AdjustmentKind | 'item' | 'header';
 
+/**
+ * Undo common OCR letter/digit swaps inside words so keywords still match:
+ * "6ST" → "gst", "C6ST" → "cgst", "SG5T" → "sgst", "T0TAL" → "total".
+ */
+export function normaliseLabel(label: string): string {
+  return label
+    .toLowerCase()
+    .split(/\s+/)
+    .map((w) => (/[a-z]/.test(w) && /[0-9]/.test(w) && !/^\d+[.,]?\d*%?$/.test(w) ? w.replace(/6/g, 'g').replace(/5/g, 's').replace(/0/g, 'o').replace(/1/g, 'l') : w))
+    .join(' ');
+}
+
 function classify(label: string): { kind: Kind; strength?: number } {
-  const l = label.toLowerCase();
+  const l = normaliseLabel(label);
   if (HEADER.test(l.replace(/\s+/g, ' ').trim()) && /[a-z]/.test(l)) return { kind: 'header' };
   if (SUBTOTAL.test(l)) return { kind: 'subtotal' };
   if (/tot(al)?\s*(gst|tax|taxes)\b/i.test(l)) return { kind: 'taxSummary' };
@@ -218,6 +231,9 @@ function classify(label: string): { kind: Kind; strength?: number } {
   if (OTHER_CHARGE.test(l)) return { kind: 'other' };
   return { kind: 'item' };
 }
+
+/** A stray whole number next to a name (e.g. "Chicken 65") — not a zero or a price with paise. */
+const isNameNumber = (a: { value: number; isInteger: boolean }) => a.isInteger && a.value > 0;
 
 /** Recover qty / unit / total from the trailing numbers and the label. */
 function itemFromLine(label: Token[], amounts: SplitLine['amounts']): Omit<ParsedItem, 'raw' | 'name' | 'line'> & { nameTokens: Token[] } | null {
@@ -241,8 +257,9 @@ function itemFromLine(label: Token[], amounts: SplitLine['amounts']): Omit<Parse
       qtyConf = q.token.confidence;
       priceConf = Math.min(priceConf, r.token.confidence);
     } else {
-      // Unknown leading numbers (e.g. an item code): fold them back into the name.
-      nameTokens = [...nameTokens, ...amounts.slice(0, -2).map((a) => a.token)];
+      // Unknown leading numbers: whole numbers may be part of the name ("Chicken 65"),
+      // stray prices or zeros are OCR debris and are dropped.
+      nameTokens = [...nameTokens, ...amounts.slice(0, -2).filter(isNameNumber).map((a) => a.token)];
       amounts = amounts.slice(-2);
     }
   }
@@ -258,7 +275,7 @@ function itemFromLine(label: Token[], amounts: SplitLine['amounts']): Omit<Parse
       qty = a.value / 100;
       unitPaise = Math.round(totalPaise / qty);
       qtyConf = a.token.confidence;
-    } else {
+    } else if (isNameNumber(a)) {
       nameTokens = [...nameTokens, a.token];
     }
   }
@@ -311,6 +328,15 @@ export function parseReceipt(lines: readonly OcrLine[]): ParsedReceipt {
   const items: (Omit<ParsedItem, 'line'> & { index: number })[] = [];
   const taxSummaries: (Omit<ParsedAdjustment, 'line'> & { index: number })[] = [];
   let summaryStarted = -1;
+  /** Seen the column header or a priced line yet? The shop name only comes before that. */
+  let bodyStarted = false;
+  /**
+   * A name-only line waiting for its numbers. Many printers wrap long items as
+   *   BUTTER GARLIC PRAWN
+   *        1   450.00   450.00
+   */
+  let pendingName: { tokens: Token[]; index: number; text: string } | null = null;
+  const rateOnlyTaxes: { label: string; rate: number; index: number; raw: string }[] = [];
 
   lines.forEach((line, index) => {
     const text = line.text.trim();
@@ -321,12 +347,48 @@ export function parseReceipt(lines: readonly OcrLine[]): ParsedReceipt {
     const label = labelTokens.map((t) => t.text).join(' ');
     const letters = label.replace(/[^A-Za-z]/g, '').length;
 
+    const pending = pendingName;
+    pendingName = null;
+    if (pending) result.ignored.push(pending.text);
+
     if (amounts.length === 0) {
-      // No price on this line: maybe the shop name at the top.
-      if (!result.merchant && items.length === 0 && letters >= 3 && !NOISE.test(label) && !HEADER.test(label)) {
-        result.merchant = cleanName(labelTokens).slice(0, 60);
+      // "SGST @ 2.50%" whose amount was not read: remember the rate, compute it later.
+      if (percentTokens.length > 0 && classify(label).kind === 'tax') {
+        const rate = parseFloat(percentTokens[percentTokens.length - 1].text.replace(/[^\d.,]/g, '').replace(',', '.'));
+        if (rate > 0 && rate <= 28) {
+          rateOnlyTaxes.push({ label: cleanName([...labelTokens, ...percentTokens]), rate, index, raw: text });
+          if (summaryStarted < 0) summaryStarted = index;
+          return;
+        }
+      }
+      const isHeader = HEADER.test(label) && letters > 0;
+      if (isHeader) bodyStarted = true;
+      const plausible = letters >= 3 && !NOISE.test(label) && !isHeader && classify(label).kind === 'item';
+      if (!bodyStarted) {
+        // Before the item table: maybe the shop name (only if it was read clearly).
+        if (!result.merchant && plausible && line.confidence >= 60) result.merchant = cleanName(labelTokens).slice(0, 60);
+        else result.ignored.push(text);
+      } else if (plausible && summaryStarted < 0) {
+        pendingName = { tokens: labelTokens, index, text };
       } else {
         result.ignored.push(text);
+      }
+      return;
+    }
+    bodyStarted = true;
+
+    // Numbers-only line right after a name-only line: join them into one item.
+    if (pending && letters < 2 && summaryStarted < 0) {
+      result.ignored.pop();
+      const digitTokens = labelTokens.filter((t) => /^\d{1,2}$/.test(t.text));
+      const parsed = itemFromLine([...pending.tokens, ...digitTokens.map((t) => ({ ...t, text: `x${t.text}` }))], amounts);
+      const name = parsed ? cleanName(parsed.nameTokens) : '';
+      if (parsed && parsed.totalPaise > 0 && /[aeiouy]/i.test(name)) {
+        const { nameTokens: _unused, ...rest } = parsed;
+        void _unused;
+        items.push({ ...rest, name, raw: `${pending.text} / ${text}`, index: pending.index });
+      } else {
+        result.ignored.push(pending.text, text);
       }
       return;
     }
@@ -383,6 +445,15 @@ export function parseReceipt(lines: readonly OcrLine[]): ParsedReceipt {
     if (kind === 'discount') amount = -Math.abs(amount);
     adjustments.push({ label: labelText, kind, amountPaise: amount, confidence: amountConf, raw: text, index });
   });
+
+  // Tax lines whose rate was read but whose amount wasn't: compute them on the subtotal
+  // (or the items) and flag them as low confidence so the user checks them.
+  if (rateOnlyTaxes.length > 0 && taxSummaries.length === 0 && !adjustments.some((a) => a.kind === 'tax')) {
+    const base = subtotals.length ? subtotals[subtotals.length - 1].amount : items.reduce((s, i) => s + i.totalPaise, 0);
+    for (const t of rateOnlyTaxes) {
+      adjustments.push({ label: `${t.label} (calculated)`, kind: 'tax', amountPaise: Math.round((base * t.rate) / 100), confidence: 0, raw: t.raw, index: t.index });
+    }
+  }
 
   // A "Total GST" line only counts when the individual CGST/SGST lines were not printed.
   if (!adjustments.some((a) => a.kind === 'tax')) adjustments.push(...taxSummaries);

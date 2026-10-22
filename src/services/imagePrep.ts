@@ -6,8 +6,15 @@
 
 export type Rotation = 0 | 90 | 180 | 270;
 
-const MAX_SIDE = 2200;
-const MIN_WIDTH = 1000;
+/**
+ * Tesseract reads best when characters are ~30 px tall. Compressed photos (e.g. forwarded on
+ * WhatsApp) are often ~1500 px, which leaves receipt text far too small, so we scale every
+ * image to a ~3600 px long side — up to 3× up, or down for huge camera photos — within a
+ * pixel budget that is safe for phone memory.
+ */
+const TARGET_LONG_SIDE = 3600;
+const MAX_UPSCALE = 3;
+const MAX_PIXELS = 8_000_000;
 
 export async function loadBitmap(file: Blob): Promise<ImageBitmap> {
   try {
@@ -35,8 +42,8 @@ export function drawRotated(bitmap: ImageBitmap, rotation: Rotation): HTMLCanvas
   const srcH = bitmap.height;
   const outW0 = swap ? srcH : srcW;
   const outH0 = swap ? srcW : srcH;
-  let scale = Math.min(1, MAX_SIDE / Math.max(outW0, outH0));
-  if (outW0 * scale < MIN_WIDTH) scale = Math.min(2, MIN_WIDTH / outW0); // upscale tiny images a little
+  let scale = Math.min(MAX_UPSCALE, TARGET_LONG_SIDE / Math.max(outW0, outH0));
+  scale = Math.min(scale, Math.sqrt(MAX_PIXELS / (outW0 * outH0)));
   const w = Math.round(outW0 * scale);
   const h = Math.round(outH0 * scale);
   const canvas = document.createElement('canvas');
@@ -64,11 +71,12 @@ export function enhanceForOcr(canvas: HTMLCanvasElement): HTMLCanvasElement {
   const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
   const img = ctx.getImageData(0, 0, w, h);
   const d = img.data;
-  const gray = new Float32Array(w * h);
+  const gray = new Uint8ClampedArray(w * h);
   for (let i = 0, p = 0; p < gray.length; i += 4, p++) gray[p] = (d[i] * 299 + d[i + 1] * 587 + d[i + 2] * 114) / 1000;
 
   // Integral image for O(1) window means.
-  const integral = new Float64Array((w + 1) * (h + 1));
+  // Uint32 is exact here: MAX_PIXELS × 255 < 2³².
+  const integral = new Uint32Array((w + 1) * (h + 1));
   for (let y = 1; y <= h; y++) {
     let row = 0;
     for (let x = 1; x <= w; x++) {

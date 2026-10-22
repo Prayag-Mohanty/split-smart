@@ -3,11 +3,14 @@ import { Avatar } from '../../components/Avatar';
 import { Icon } from '../../components/Icon';
 import { CATEGORY_META, EmptyState } from '../../components/ui';
 import { formatINR } from '../../lib/money';
+import { paidPhrase } from '../../lib/people';
+import { matchesQuery } from '../../lib/search';
 import { expenseShares, expenseTotal } from '../../lib/split';
 import { CATEGORIES, type Category, type Group } from '../../lib/types';
 
 export function ExpensesTab({ group }: { group: Group }) {
   const [filter, setFilter] = useState<Category | 'All'>('All');
+  const [query, setQuery] = useState('');
   const order = useMemo(() => group.members.map((m) => m.id), [group.members]);
   const byId = useMemo(() => new Map(group.members.map((m) => [m.id, m])), [group.members]);
 
@@ -29,6 +32,7 @@ export function ExpensesTab({ group }: { group: Group }) {
 
   const items = [...group.expenses]
     .filter((e) => filter === 'All' || e.category === filter)
+    .filter((e) => matchesQuery(e, group, query))
     .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
 
   if (group.expenses.length === 0) {
@@ -49,6 +53,22 @@ export function ExpensesTab({ group }: { group: Group }) {
 
   return (
     <>
+      <div className="search-box">
+        <Icon name="search" size={18} className="muted" />
+        <input
+          type="search"
+          className="input"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search expenses, items, people or ₹ amount"
+          aria-label="Search expenses"
+        />
+        {query && (
+          <button type="button" className="icon-btn" onClick={() => setQuery('')} aria-label="Clear search">
+            <Icon name="close" size={16} />
+          </button>
+        )}
+      </div>
       <div className="filter-row" role="radiogroup" aria-label="Filter by category">
         {(['All', ...CATEGORIES] as const).map((c) => (
           <button key={c} type="button" role="radio" aria-checked={filter === c} className={`chip-btn${filter === c ? ' active' : ''}`} onClick={() => setFilter(c)}>
@@ -57,7 +77,16 @@ export function ExpensesTab({ group }: { group: Group }) {
           </button>
         ))}
       </div>
-      {sections.length === 0 && <p className="muted center">No {filter.toLowerCase()} expenses.</p>}
+      {sections.length === 0 && (
+        <p className="muted center-text">
+          {query ? `No ${filter === 'All' ? '' : `${filter.toLowerCase()} `}expenses match “${query}”.` : `No ${filter.toLowerCase()} expenses.`}
+        </p>
+      )}
+      {query && sections.length > 0 && (
+        <p className="small muted" aria-live="polite">
+          {items.length} expense{items.length === 1 ? '' : 's'} found
+        </p>
+      )}
       {sections.map((s) => (
         <section key={s.date} className="expense-section">
           <h3 className="date-heading">{new Date(s.date).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</h3>
@@ -77,11 +106,15 @@ export function ExpensesTab({ group }: { group: Group }) {
                     <span className="grow min0">
                       <span className="row-title">
                         {e.description}
-                        {e.kind === 'itemized' && <Icon name="receipt" size={14} className="muted inline-icon" title="Itemized receipt" />}
+                        {e.kind === 'itemized' && (
+                          <span className="pill pill-neutral" title="Itemized receipt">
+                            <Icon name="receipt" size={12} /> Itemised · {e.items.length}
+                          </span>
+                        )}
                         {e.recurringId && <Icon name="repeat" size={14} className="muted inline-icon" title="Recurring" />}
                       </span>
                       <span className="row-sub">
-                        {payer && <Avatar member={payer} size="sm" />} {payer?.name ?? 'Someone'} paid · split {n} way{n === 1 ? '' : 's'}
+                        {payer && <Avatar member={payer} size="sm" />} {paidPhrase(group, e.payerId)} · split {n} way{n === 1 ? '' : 's'}
                         {n === 0 && <span className="error-text"> (needs fixing)</span>}
                       </span>
                     </span>

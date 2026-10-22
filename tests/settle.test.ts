@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeNetBalances, simplifyDebts, suggestSettlements } from '../src/lib/settle';
+import { computeNetBalances, rawDebts, simplifyDebts, suggestSettlements } from '../src/lib/settle';
 import type { Expense, Group } from '../src/lib/types';
 
 const apply = (balances: Record<string, number>, transfers: ReturnType<typeof simplifyDebts>) => {
@@ -101,6 +101,12 @@ describe('group balances', () => {
     expect(t.length).toBe(bruteMin(Object.values(nets)));
     expect(Object.values(apply(nets, t)).every((v) => v === 0)).toBe(true);
 
+    // The unsimplified IOUs describe the same balances, with at least as many payments.
+    const raw = rawDebts(group);
+    const zero = Object.fromEntries(members.map((m) => [m.id, 0]));
+    expect(apply(zero, raw)).toEqual(Object.fromEntries(Object.entries(nets).map(([k, v]) => [k, -v])));
+    expect(raw.length).toBeGreaterThanOrEqual(t.length);
+
     // Recording the suggested payments as settlements clears every balance.
     const settled: Group = {
       ...group,
@@ -108,5 +114,6 @@ describe('group balances', () => {
     };
     expect(Object.values(computeNetBalances(settled)).every((v) => v === 0)).toBe(true);
     expect(suggestSettlements(settled)).toEqual([]);
+    expect(Object.values(apply(zero, rawDebts(settled))).every((v) => v === 0)).toBe(true);
   });
 });

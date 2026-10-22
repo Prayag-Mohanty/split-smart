@@ -1,8 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../../components/Icon';
+import { Modal } from '../../components/Modal';
 import { MoneyInput } from '../../components/MoneyInput';
 import { Banner, CategorySelect } from '../../components/ui';
 import { useClassifierStatus } from '../../hooks/useCategorizer';
+import { GST_RATES, gstLines, guessGstRate } from '../../lib/gst';
 import { formatINR } from '../../lib/money';
 import { checkTotals, LOW_CONFIDENCE } from '../../lib/receiptParser';
 import { signedAdjustment } from '../../lib/split';
@@ -26,7 +28,20 @@ const KIND_LABEL: Record<AdjustmentKind, string> = { tax: 'Tax / GST', service: 
 
 export function ReviewStep({ draft, update, image, categorizing, canRescan, onRotate, onRetake, onManualFallback, onNext }: ReviewStepProps) {
   const [activeLine, setActiveLine] = useState<number | undefined>();
-  const [showImage, setShowImage] = useState(true);
+  // Phones start with a compact, sticky strip so the fields to fix come first; desktop shows the photo beside the table.
+  const [showImage, setShowImage] = useState(() => window.matchMedia?.('(min-width: 960px)').matches ?? true);
+  const [zoomed, setZoomed] = useState(false);
+  const [zoom, setZoom] = useState<1 | 2>(1);
+  const stageRef = useRef<HTMLDivElement>(null);
+
+  // Keep the line being edited in view inside the photo strip / panel.
+  useEffect(() => {
+    const stage = stageRef.current;
+    const box = activeLine !== undefined ? image?.lines[activeLine]?.bbox : undefined;
+    if (!stage || !box || !image) return;
+    const scale = stage.scrollWidth / image.width;
+    stage.scrollTo({ top: Math.max(0, box.y0 * scale - stage.clientHeight / 3), behavior: 'smooth' });
+  }, [activeLine, image, showImage]);
   const { status, progress } = useClassifierStatus();
 
   const check = useMemo(
@@ -54,14 +69,34 @@ export function ReviewStep({ draft, update, image, categorizing, canRescan, onRo
 
   const confirmComputed = () => update((d) => ({ ...d, printedTotalPaise: check.computedPaise, totalSource: 'confirmed', totalLow: undefined }));
   const addDifference = () =>
-    update((d) => ({ ...d, adjustments: [...d.adjustments, newAdjustment('other', check.differencePaise > 0 ? 'Unmatched charges' : 'Unmatched reduction', check.differencePaise)] }));
+    update((d) => ({
+      ...d,
+      adjustments: [
+        ...d.adjustments,
+        newAdjustment('other', Math.abs(check.differencePaise) < 100 ? 'Round off' : check.differencePaise > 0 ? 'Unmatched charges' : 'Unmatched reduction', check.differencePaise),
+      ],
+    }));
+
+  // GST is charged on the items after any discount.
+  const gstBase = check.itemsPaise + draft.adjustments.filter((a) => a.kind === 'discount').reduce((s, a) => s + signedAdjustment(a), 0);
+  const hasTax = draft.adjustments.some((a) => a.kind === 'tax');
+  /** Replace any tax lines with CGST + SGST at a standard GST rate. */
+  const setGst = (rate: number) =>
+    update((d) => ({
+      ...d,
+      adjustments: [...d.adjustments.filter((a) => a.kind !== 'tax'), ...gstLines(gstBase, rate).map((l) => newAdjustment('tax', l.label, l.amountPaise))],
+    }));
+  // If the printed total minus everything except tax looks like a GST slab, offer it.
+  const taxPaise = draft.adjustments.filter((a) => a.kind === 'tax').reduce((sum, a) => sum + a.amountPaise, 0);
+  const suggestedRate =
+    draft.printedTotalPaise !== undefined && !check.matches ? guessGstRate(draft.printedTotalPaise - (check.computedPaise - taxPaise), gstBase) : undefined;
 
   const needsConfirm = !noItems && draft.totalSource === 'none';
   const mismatch = !noItems && draft.printedTotalPaise !== undefined && !check.matches;
 
   return (
     <div className="review-layout">
-      <aside className="review-image" aria-label="Original receipt">
+      <aside className={`review-image${image && !showImage ? ' is-strip' : ''}`} aria-label="Original receipt">
         {image ? (
           <div className="card">
             <div className="review-image-head">
@@ -70,29 +105,28 @@ export function ReviewStep({ draft, update, image, categorizing, canRescan, onRo
                 {showImage ? 'Hide' : 'Show'}
               </button>
             </div>
+            <div
+              ref={stageRef}
+              className={`image-stage${showImage ? '' : ' compact'}`}
+              onClick={() => !showImage && setZoomed(true)}
+              role={showImage ? undefined : 'button'}
+              tabIndex={showImage ? undefined : 0}
+              aria-label={showImage ? undefined : 'Open the receipt photo full screen'}
+              onKeyDown={(e) => !showImage && (e.key === 'Enter' || e.key === ' ') && setZoomed(true)}
+            >
+              <ReceiptImage image={image} activeLine={activeLine} />
+              {!showImage && (
+                <span className="strip-hint">
+                  <Icon name="image" size={14} /> Tap to zoom
+                </span>
+              )}
+            </div>
             {showImage && (
               <>
-                <div className="image-stage">
-                  <img src={image.url} alt="Scanned receipt" />
-                  <svg viewBox={`0 0 ${image.width} ${image.height}`} className="ocr-overlay" aria-hidden="true">
-                    {image.lines.flatMap((l, li) =>
-                      l.words
-                        .filter((w) => w.bbox && w.confidence < LOW_CONFIDENCE)
-                        .map((w, wi) => <rect key={`${li}-${wi}`} className="ocr-low" x={w.bbox!.x0} y={w.bbox!.y0} width={w.bbox!.x1 - w.bbox!.x0} height={w.bbox!.y1 - w.bbox!.y0} rx={4} />),
-                    )}
-                    {activeLine !== undefined && image.lines[activeLine]?.bbox && (
-                      <rect
-                        className="ocr-active"
-                        x={image.lines[activeLine].bbox!.x0 - 6}
-                        y={image.lines[activeLine].bbox!.y0 - 4}
-                        width={image.lines[activeLine].bbox!.x1 - image.lines[activeLine].bbox!.x0 + 12}
-                        height={image.lines[activeLine].bbox!.y1 - image.lines[activeLine].bbox!.y0 + 8}
-                        rx={6}
-                      />
-                    )}
-                  </svg>
-                </div>
                 <div className="preview-tools" role="toolbar" aria-label="Image tools">
+                  <button type="button" className="btn btn-sm" onClick={() => setZoomed(true)} aria-label="Open full screen">
+                    <Icon name="image" size={16} /> Zoom
+                  </button>
                   <button type="button" className="btn btn-sm" onClick={() => onRotate(-90)} disabled={!canRescan} aria-label="Rotate left and re-scan">
                     <Icon name="rotateL" size={16} />
                   </button>
@@ -121,6 +155,20 @@ export function ReviewStep({ draft, update, image, categorizing, canRescan, onRo
           )
         )}
       </aside>
+      {image && (
+        <Modal open={zoomed} title="Original receipt" onClose={() => setZoomed(false)} wide>
+          <div className="zoom-controls">
+            <button type="button" className="btn btn-sm" onClick={() => setZoom((z) => (z === 1 ? 2 : 1))} aria-pressed={zoom === 2}>
+              {zoom === 1 ? 'Zoom in 2×' : 'Fit to screen'}
+            </button>
+          </div>
+          <div className="zoom-stage">
+            <div style={{ width: `${zoom * 100}%` }}>
+              <ReceiptImage image={image} activeLine={activeLine} />
+            </div>
+          </div>
+        </Modal>
+      )}
 
       <section className="review-data stack" aria-label="Parsed receipt">
         {image && noItems && (
@@ -262,6 +310,14 @@ export function ReviewStep({ draft, update, image, categorizing, canRescan, onRo
               <Icon name="plus" size={16} /> Discount
             </button>
           </div>
+          <div className="row-wrap gst-quick" role="group" aria-label="Set GST">
+            <span className="small muted">{hasTax ? 'Replace tax with GST:' : 'Bill had GST? Add CGST + SGST:'}</span>
+            {GST_RATES.slice(0, 3).map((r) => (
+              <button key={r} type="button" className="chip-btn" onClick={() => setGst(r)} disabled={gstBase <= 0} title={`CGST ${r / 2}% + SGST ${r / 2}% on ${formatINR(gstBase)}`}>
+                {r}%
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="card stack totals-card">
@@ -301,6 +357,11 @@ export function ReviewStep({ draft, update, image, categorizing, canRescan, onRo
               </strong>{' '}
               The items and charges come to {formatINR(check.computedPaise)} but the receipt says {formatINR(draft.printedTotalPaise!)}. Check the highlighted fields, or:
               <div className="row-wrap banner-actions">
+                {suggestedRate !== undefined && (
+                  <button type="button" className="btn btn-sm btn-primary" onClick={() => setGst(suggestedRate)}>
+                    Looks like {suggestedRate}% GST — add CGST + SGST
+                  </button>
+                )}
                 <button type="button" className="btn btn-sm" onClick={addDifference}>
                   Add {formatINR(check.differencePaise, { sign: true })} as a line
                 </button>
@@ -342,6 +403,24 @@ export function ReviewStep({ draft, update, image, categorizing, canRescan, onRo
           {needsConfirm ? `Confirm ${formatINR(check.computedPaise)} & assign` : mismatch ? 'Continue anyway' : 'Next: assign items'} <Icon name="arrowRight" />
         </button>
       </div>
+    </div>
+  );
+}
+
+/** The receipt photo with low-confidence words and the active line outlined. */
+function ReceiptImage({ image, activeLine }: { image: ScanImage; activeLine?: number }) {
+  const active = activeLine !== undefined ? image.lines[activeLine]?.bbox : undefined;
+  return (
+    <div className="receipt-image">
+      <img src={image.url} alt="Scanned receipt" />
+      <svg viewBox={`0 0 ${image.width} ${image.height}`} className="ocr-overlay" aria-hidden="true">
+        {image.lines.flatMap((l, li) =>
+          l.words
+            .filter((w) => w.bbox && w.confidence < LOW_CONFIDENCE)
+            .map((w, wi) => <rect key={`${li}-${wi}`} className="ocr-low" x={w.bbox!.x0} y={w.bbox!.y0} width={w.bbox!.x1 - w.bbox!.x0} height={w.bbox!.y1 - w.bbox!.y0} rx={4} />),
+        )}
+        {active && <rect className="ocr-active" x={active.x0 - 6} y={active.y0 - 4} width={active.x1 - active.x0 + 12} height={active.y1 - active.y0 + 8} rx={6} />}
+      </svg>
     </div>
   );
 }

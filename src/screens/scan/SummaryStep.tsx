@@ -1,11 +1,14 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Avatar } from '../../components/Avatar';
 import { Icon } from '../../components/Icon';
+import { toast } from '../../components/Toast';
 import { Banner, CategorySelect } from '../../components/ui';
 import { formatINR } from '../../lib/money';
+import { personName } from '../../lib/people';
+import { suggestSettlements } from '../../lib/settle';
 import { computeItemizedSplit } from '../../lib/split';
 import type { Group } from '../../lib/types';
-import { dominantCategory, type Draft } from './draft';
+import { dominantCategory, draftToExpense, type Draft } from './draft';
 
 interface SummaryStepProps {
   group: Group;
@@ -24,6 +27,47 @@ export function SummaryStep({ group, draft, update, onBack, onSave, onDelete }: 
   const has = (k: 'tax' | 'service' | 'discount' | 'other') => split.breakdown.some((b) => b.byKind[k] !== 0);
   const sum = split.breakdown.reduce((s, b) => s + b.totalPaise, 0);
   const category = draft.categoryLocked ? draft.category : dominantCategory(draft.items);
+  const [sharing, setSharing] = useState(false);
+
+  // What this bill means in money terms: who pays the payer, and the group's settle-up afterwards.
+  const owes = split.breakdown.filter((b) => b.memberId !== draft.payerId && b.totalPaise > 0);
+  const groupAfter = useMemo(() => {
+    if (!split.ok) return [];
+    const expense = draftToExpense(draft);
+    return suggestSettlements({ ...group, expenses: [expense, ...group.expenses.filter((e) => e.id !== expense.id)] });
+  }, [group, draft, split.ok]);
+
+  const shareCard = async () => {
+    if (!payer) return;
+    setSharing(true);
+    try {
+      const { renderBillCard, shareOrDownload } = await import('../../services/billCard');
+      const byId = new Map(group.members.map((m) => [m.id, m]));
+      const blob = await renderBillCard({
+        title: draft.description || 'Receipt',
+        date: new Date(draft.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+        groupName: group.name,
+        total: split.billTotal,
+        payer,
+        shares: split.breakdown
+          .filter((b) => byId.has(b.memberId))
+          .map((b) => ({
+            member: byId.get(b.memberId)!,
+            amount: b.totalPaise,
+            label: draft.items
+              .filter((i) => i.assignees.includes(b.memberId))
+              .map((i) => i.name)
+              .join(', '),
+          })),
+      });
+      const how = await shareOrDownload(blob, `${(draft.description || 'bill').replace(/[^\w-]+/g, '_')}.png`, draft.description || 'Bill split');
+      if (how === 'downloaded') toast('Bill card saved — post it in your group chat');
+    } catch {
+      toast('Could not create the bill card', 'error');
+    } finally {
+      setSharing(false);
+    }
+  };
 
   return (
     <div className="stack-lg">
@@ -31,9 +75,18 @@ export function SummaryStep({ group, draft, update, onBack, onSave, onDelete }: 
       <div className="card summary-hero">
         <span className="muted small">{draft.description || 'Receipt'}</span>
         <strong className="big-amount">{formatINR(split.billTotal)}</strong>
-        <span className="small">
-          paid by {payer && <Avatar member={payer} size="sm" />} <strong>{payer?.name}</strong>
-        </span>
+        <label className="payer-chip">
+          {payer && <Avatar member={payer} size="sm" />}
+          <span>Paid by</span>
+          <select value={draft.payerId} onChange={(e) => update((d) => ({ ...d, payerId: e.target.value }))} aria-label="Paid by">
+            {group.members.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.id === group.meId ? `${m.name} (you)` : m.name}
+              </option>
+            ))}
+          </select>
+          <span aria-hidden="true">▾</span>
+        </label>
       </div>
 
       <div className="card">
@@ -93,6 +146,20 @@ export function SummaryStep({ group, draft, update, onBack, onSave, onDelete }: 
             <Icon name="check" size={14} /> Shares add up exactly to {formatINR(split.billTotal)}.
           </p>
         )}
+        {split.ok && owes.length > 0 && (
+          <div className="consequence">
+            <strong>For this bill:</strong>{' '}
+            {owes.map((b, i) => (
+              <span key={b.memberId}>
+                {i > 0 && ' · '}
+                {personName(group, b.memberId)} → {personName(group, draft.payerId)} {formatINR(b.totalPaise)}
+              </span>
+            ))}
+            <div className="small muted">
+              After saving, the whole group settles up in {groupAfter.length} payment{groupAfter.length === 1 ? '' : 's'}.
+            </div>
+          </div>
+        )}
         <details className="small muted">
           <summary>How is this calculated?</summary>
           <p>
@@ -111,6 +178,10 @@ export function SummaryStep({ group, draft, update, onBack, onSave, onDelete }: 
         </label>
         <p className="small muted">Insights use each item's own category; this one labels the expense in lists.</p>
       </div>
+
+      <button type="button" className="btn btn-share" onClick={shareCard} disabled={!split.ok || sharing}>
+        <Icon name="share" size={18} /> {sharing ? 'Drawing card…' : 'Share bill card (WhatsApp-ready)'}
+      </button>
 
       {onDelete && (
         <button type="button" className="btn btn-danger" onClick={onDelete}>

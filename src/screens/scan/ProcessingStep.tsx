@@ -9,10 +9,14 @@ export function ProcessingStep({ preview, progress, onCancel }: { preview: strin
         <span className="scan-line" aria-hidden="true" />
       </div>
       <div className="processing-status" aria-live="polite">
-        <strong>{progress.stage}…</strong>
+        <strong>
+          {progress.stage}
+          {progress.progress < 1 ? '…' : ''}
+        </strong>
         <span className="muted">{Math.round(progress.progress * 100)}%</span>
       </div>
       <ProgressBar value={progress.progress} label="Reading receipt" />
+      <p className="small center-text">Takes ~3 seconds. Everything stays on your phone.</p>
       <p className="small muted center-text">You can keep using the app — text recognition runs in a background worker.</p>
       <button type="button" className="btn btn-ghost" onClick={onCancel}>
         Cancel

@@ -163,12 +163,45 @@ function greedySettle(ids: readonly MemberId[], balances: Record<MemberId, Paise
   return out;
 }
 
-/** Suggested payments for a whole group. */
+/**
+ * Suggested payments for a whole group: the minimum set when the group simplifies debts
+ * (the default), otherwise every person-to-person debt as it arose.
+ */
 export function suggestSettlements(group: Group): Transfer[] {
+  if (group.simplifyDebts === false) return rawDebts(group);
   return simplifyDebts(computeNetBalances(group), group.members.map((m) => m.id));
 }
 
 /** Total spent in a group (sum of all expense totals). */
 export function groupSpend(group: Group): Paise {
   return group.expenses.reduce((s, e) => s + expenseTotal(e), 0);
+}
+
+/**
+ * The debts as they arise, before any simplification: for every expense, each participant
+ * owes the payer their share. Opposite debts between the same two people are netted, and
+ * recorded settlements are subtracted. Used to show "N IOUs → M payments".
+ */
+export function rawDebts(group: Group): Transfer[] {
+  const order = group.members.map((m) => m.id);
+  const pair = new Map<string, number>(); // key "from|to" with from < to in member order; value > 0 means from owes to
+  const rank = new Map(order.map((id, i) => [id, i]));
+  const add = (from: MemberId, to: MemberId, amount: Paise) => {
+    if (from === to || amount === 0) return;
+    const [a, b, sign] = (rank.get(from) ?? 1e9) < (rank.get(to) ?? 1e9) ? [from, to, 1] : [to, from, -1];
+    const key = `${a}|${b}`;
+    pair.set(key, (pair.get(key) ?? 0) + sign * amount);
+  };
+  for (const e of group.expenses) {
+    const shares = expenseShares(e, order);
+    for (const [id, share] of Object.entries(shares)) add(id, e.payerId, share);
+  }
+  for (const s of group.settlements) add(s.toId, s.fromId, s.amountPaise); // a payment cancels debt from→to
+  const out: Transfer[] = [];
+  for (const [key, v] of pair) {
+    const [a, b] = key.split('|');
+    if (v > 0) out.push({ fromId: a, toId: b, amountPaise: v });
+    else if (v < 0) out.push({ fromId: b, toId: a, amountPaise: -v });
+  }
+  return out;
 }

@@ -123,3 +123,39 @@ describe('analytics', () => {
     expect(t.map((x) => x.total)).toEqual([10001, 0, 110000]);
   });
 });
+
+import { gstLines, guessGstRate } from '../src/lib/gst';
+
+describe('GST helpers', () => {
+  it('splits a rate into equal CGST and SGST lines on the subtotal', () => {
+    expect(gstLines(237000, 5)).toEqual([
+      { label: 'CGST 2.5%', amountPaise: 5925 },
+      { label: 'SGST 2.5%', amountPaise: 5925 },
+    ]);
+    expect(gstLines(10000, 18)[0].label).toBe('CGST 9%');
+  });
+  it('guesses the GST slab from a missing amount', () => {
+    expect(guessGstRate(11850, 237000)).toBe(5);
+    expect(guessGstRate(11900, 237000)).toBe(5); // with round-off
+    expect(guessGstRate(42660, 237000)).toBe(18);
+    expect(guessGstRate(5000, 237000)).toBeUndefined();
+  });
+});
+
+import { formatINR } from '../src/lib/money';
+import { balancePhrase, personName } from '../src/lib/people';
+
+describe('second-person copy', () => {
+  const g = { meId: 'a', members: [{ id: 'a', name: 'Riya', color: '#000' }, { id: 'b', name: 'Arjun', color: '#000' }] };
+  it('calls the current user "You"', () => {
+    expect(personName(g, 'a')).toBe('You');
+    expect(personName(g, 'a', { lower: true })).toBe('you');
+    expect(balancePhrase(g, 'a', 67200)).toBe('You get back ₹672.00');
+    expect(balancePhrase(g, 'b', -16800)).toBe('Arjun owes ₹168.00');
+    expect(balancePhrase(g, 'a', 0)).toBe('You are settled up');
+  });
+  it('compact money drops .00 only for whole rupees', () => {
+    expect(formatINR(238000, { compact: true })).toBe('₹2,380');
+    expect(formatINR(34933, { compact: true })).toBe('₹349.33');
+  });
+});

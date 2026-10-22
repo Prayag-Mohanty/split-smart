@@ -3,6 +3,7 @@ import { AppBar } from '../../components/AppBar';
 import { toast } from '../../components/Toast';
 import { navigate } from '../../hooks/useHashRoute';
 import { todayIso } from '../../lib/ids';
+import { initialSplit } from '../../lib/defaultSplit';
 import { parseReceipt, type OcrLine } from '../../lib/receiptParser';
 import type { Category, Group } from '../../lib/types';
 import { categorize } from '../../services/classifier';
@@ -16,6 +17,8 @@ import { draftFromExpense, draftFromParsed, draftToExpense, emptyDraft, type Dra
 import { ProcessingStep } from './ProcessingStep';
 import { ReviewStep } from './ReviewStep';
 import { SummaryStep } from './SummaryStep';
+
+let categorizerWarned = false;
 
 export type Step = 'capture' | 'processing' | 'review' | 'assign' | 'summary';
 
@@ -57,7 +60,8 @@ function Flow({ group, editing }: { group: Group; editing?: Extract<Group['expen
   const [image, setImage] = useState<ScanImage | null>(null);
   const [progress, setProgress] = useState<OcrProgress>({ stage: 'Preparing', progress: 0 });
   const [error, setError] = useState('');
-  const [draft, setDraft] = useState<Draft>(() => (editing ? draftFromExpense(editing) : emptyDraft(group.members[0].id, todayIso())));
+  const defaultPayer = useStore((s) => initialSplit(group, s.settings.defaultSplits?.[group.id]).payerId);
+  const [draft, setDraft] = useState<Draft>(() => (editing ? draftFromExpense(editing) : emptyDraft(defaultPayer, todayIso())));
   const [categorizing, setCategorizing] = useState(false);
   const runId = useRef(0);
   const dirty = useRef(false);
@@ -120,7 +124,11 @@ function Flow({ group, editing }: { group: Group; editing?: Extract<Group['expen
           items: cur.items.map((it) => (it.categoryLocked || !byId.has(it.id) ? it : { ...it, category: byId.get(it.id)! })),
         }));
       } catch {
-        toast('Auto-categorisation is unavailable right now — pick categories manually.', 'info');
+        // Say it once per session, not on every receipt.
+        if (!categorizerWarned) {
+          categorizerWarned = true;
+          toast('Auto-categorisation is unavailable right now — pick categories manually.', 'info');
+        }
       } finally {
         setCategorizing(false);
       }
@@ -150,7 +158,7 @@ function Flow({ group, editing }: { group: Group; editing?: Extract<Group['expen
           const parsed = parseReceipt(result.lines);
           const score = parsed.items.length * 10 + (parsed.totalPaise !== undefined ? 15 : 0) + result.meanConfidence / 10;
           if (!best || score > best.score) best = { rot: r, canvas, result, parsed, score };
-          if (parsed.items.length > 0 && result.meanConfidence >= 60) break;
+          if (parsed.items.length >= 2 || (parsed.items.length > 0 && result.meanConfidence >= 50)) break;
         }
         if (!best) return;
         const { result, parsed } = best;
@@ -161,6 +169,16 @@ function Flow({ group, editing }: { group: Group; editing?: Extract<Group['expen
         const colourUrl = URL.createObjectURL(await canvasToBlob(drawRotated(bitmap, best.rot)));
         setImage({ url: colourUrl, width: best.canvas.width, height: best.canvas.height, lines: result.lines, meanConfidence: result.meanConfidence });
         const next = draftFromParsed(parsed, emptyDraft(draft.payerId, todayIso()));
+        // A short "what we found" beat before the review screen.
+        const taxes = parsed.adjustments.filter((a) => a.kind === 'tax').length;
+        setProgress({
+          stage: parsed.items.length
+            ? `Found ${parsed.items.length} item${parsed.items.length === 1 ? '' : 's'}${taxes ? `, ${taxes} tax${taxes === 1 ? '' : 'es'}` : ''}`
+            : 'No items found',
+          progress: 1,
+        });
+        await new Promise((r) => setTimeout(r, 650));
+        if (id !== runId.current) return;
         setDraft(next);
         dirty.current = true;
         setStep('review');
@@ -209,6 +227,12 @@ function Flow({ group, editing }: { group: Group; editing?: Extract<Group['expen
   };
 
   const stepIndex = STEPS.findIndex((s) => s.id === (step === 'processing' ? 'capture' : step));
+  // Slide forward or back depending on the direction of travel between steps.
+  const lastIndex = useRef(stepIndex);
+  const direction = stepIndex >= lastIndex.current ? 'forward' : 'back';
+  useEffect(() => {
+    lastIndex.current = stepIndex;
+  }, [stepIndex]);
   const batchLabel = queue.length > 1 ? ` · receipt ${queueIndex + 1} of ${queue.length}` : '';
 
   return (
@@ -225,6 +249,7 @@ function Flow({ group, editing }: { group: Group; editing?: Extract<Group['expen
         </ol>
       </nav>
       <main id="main" className={`page with-fab ${step === 'review' ? 'wide' : ''}`}>
+        <div key={step} className={`step-anim step-${direction}`}>
         {step === 'capture' && (
           <CaptureStep
             preview={bitmap ? preview : ''}
@@ -287,6 +312,7 @@ function Flow({ group, editing }: { group: Group; editing?: Extract<Group['expen
             }
           />
         )}
+        </div>
       </main>
     </>
   );

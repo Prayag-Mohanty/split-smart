@@ -115,4 +115,56 @@ describe('parseReceipt', () => {
     expect(r.items[0].confidence.name).toBe(92);
     expect(r.items[0].confidence.price).toBe(41);
   });
+
+  it('joins item names with the qty/price/amount printed on the next line', () => {
+    const r = parse(`
+      SEAROCK RESTAURANT
+      ITEM   QTY   PRICE   AMOUNT
+      WATER    1   20.00   20.00
+      BUTTER GARLIC PRAWN
+        1    450.00   450.00
+      TAWA CALAMARI
+      \\   450.00 © 450.00
+      LEMON SODA/LEMON JUICE
+        2    100.00   200.00
+      ITEM: 8 QTY: 9
+      AMOUNT : 2370.00
+    `);
+    expect(r.items.map((i) => [i.name, i.qty, i.totalPaise])).toEqual([
+      ['WATER', 1, 2000],
+      ['BUTTER GARLIC PRAWN', 1, 45000],
+      ['TAWA CALAMARI', 1, 45000],
+      ['LEMON SODA/LEMON JUICE', 2, 20000],
+    ]);
+  });
+
+  it('drops stray zeros instead of gluing them onto names', () => {
+    const r = parse(`WAIER 0.00 20.0\nCHILLI PANEER 0 350.00`);
+    expect(r.items.map((i) => [i.name, i.totalPaise])).toEqual([
+      ['WAIER', 2000],
+      ['CHILLI PANEER', 35000],
+    ]);
+  });
+
+  it('recognises GST keywords despite OCR digit swaps', () => {
+    const r = parse(`Dosa 100.00\nC6ST 2.50\nSG5T 2.50\nGrand T0TAL 105.00`);
+    expect(r.adjustments.map((a) => [a.kind, a.amountPaise])).toEqual([
+      ['tax', 250],
+      ['tax', 250],
+    ]);
+    expect(r.totalPaise).toBe(10500);
+  });
+
+  it('computes tax lines whose rate was read but amount was not', () => {
+    const r = parse(`Fish Curry 2070.00\nWater 300.00\nAMOUNT : 2370.00\nSGST @ 2.50%\nCGST @ 2.50%`);
+    expect(r.adjustments.map((a) => [a.kind, a.amountPaise, a.confidence])).toEqual([
+      ['tax', 5925, 0],
+      ['tax', 5925, 0],
+    ]);
+  });
+
+  it('uses "Total GST" when the CGST/SGST lines were unreadable', () => {
+    const r = parse(`Fish Curry 2370.00\nxx ## 1\nTOTAL GST 118.50\nGRAND TOTAL 2489.00`);
+    expect(r.adjustments.map((a) => a.amountPaise)).toEqual([11850]);
+  });
 });

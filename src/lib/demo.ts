@@ -28,6 +28,7 @@ export function demoGroup(): Group {
   });
   return {
     id: uid('g_'),
+    meId: riya,
     name: 'Night Canteen Gang',
     emoji: '🌙',
     createdAt: Date.now(),
