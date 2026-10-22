@@ -115,9 +115,9 @@ export function normaliseNumberToken(raw: string): string {
 
 function parseAmountToken(tok: string): Paise | null {
   if (!NUMERIC_LIKE.test(tok)) return null;
-  const digits = tok.replace(/[^\d]/g, '').length;
-  const letters = tok.replace(/[^A-Za-z]/g, '').replace(/^(rs|inr)/i, '').length;
-  if (letters > digits) return null;
+  // Only letters that OCR commonly confuses with digits (O, l, I, S, B) may appear.
+  const letters = tok.replace(/^\(?-?(rs\.?|inr)/i, '').replace(/[^A-Za-z]/g, '');
+  if (/[^OoSlIB]/.test(letters)) return null;
   const value = parseMoney(normaliseNumberToken(tok));
   if (value === null) return null;
   return value;
@@ -355,7 +355,9 @@ export function parseReceipt(lines: readonly OcrLine[]): ParsedReceipt {
         return;
       }
       const name = cleanName(parsed.nameTokens);
-      if (name.replace(/[^A-Za-z]/g, '').length < 2) {
+      const avgConf = (parsed.confidence.name + parsed.confidence.price) / 2;
+      // Reject gibberish (no vowels, e.g. OCR of a photo that is not a receipt) and near-zero confidence.
+      if (name.replace(/[^A-Za-z]/g, '').length < 2 || !/[aeiouy]/i.test(name) || avgConf < 30) {
         result.ignored.push(text);
         return;
       }
