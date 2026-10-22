@@ -84,7 +84,14 @@ export async function renderBillCard(input: BillCardInput): Promise<Blob> {
     ctx.font = font(r, 700);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const initials = m.emoji || m.name.split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase();
+    const initials =
+      m.emoji ||
+      m.name
+        .split(/\s+/)
+        .map((p) => p[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase();
     ctx.fillText(initials, cx, cy + 2);
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';

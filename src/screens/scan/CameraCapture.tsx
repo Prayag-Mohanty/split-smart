@@ -46,7 +46,10 @@ export function CameraCapture({ open, onClose, onCapture, onUnavailable }: Camer
         const v = videoRef.current;
         if (v) {
           v.srcObject = stream;
-          v.play().then(() => setReady(true), () => setReady(true));
+          v.play().then(
+            () => setReady(true),
+            () => setReady(true),
+          );
         }
       })
       .catch((err) => {

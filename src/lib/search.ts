@@ -25,11 +25,7 @@ function haystack(expense: Expense, group: Group): string {
 }
 
 export function matchesQuery(expense: Expense, group: Group, query: string): boolean {
-  const words = query
-    .toLowerCase()
-    .replace(/[₹,]/g, '')
-    .split(/\s+/)
-    .filter(Boolean);
+  const words = query.toLowerCase().replace(/[₹,]/g, '').split(/\s+/).filter(Boolean);
   if (words.length === 0) return true;
   const text = haystack(expense, group);
   return words.every((w) => text.includes(w));

@@ -131,3 +131,25 @@ describe('percentage tax lines', () => {
     expect(applyRates(d)).toBe(d);
   });
 });
+
+import { categoryHint } from '../src/lib/categoryHints';
+
+describe('category keyword hints', () => {
+  it.each([
+    ['Lemon Soda/Lemon Juice', 'Food'],
+    ['BUTTER GARLIC PRAWN', 'Food'],
+    ['Water', 'Food'],
+    ['Water bill', 'Utilities'],
+    ['Surf Excel 1kg', 'Groceries'],
+    ['Amul Milk 1L', 'Groceries'],
+    ['Cab to Panjim', 'Travel'],
+    ['Movie tickets', 'Entertainment'],
+    ['Wi-Fi recharge', 'Utilities'],
+    ['Paracetamol from pharmacy', 'Other'],
+  ])('%s -> %s', (text, cat) => expect(categoryHint(text)).toBe(cat));
+
+  it('leaves garbled or unknown names to the model', () => {
+    expect(categoryHint('Leno SOE go')).toBeUndefined();
+    expect(categoryHint('Xyz 123')).toBeUndefined();
+  });
+});

@@ -27,8 +27,13 @@ export function MoneyInput({ value, onChange, id, label, className = '', placeho
   }, [value, focused]);
 
   return (
-    <span className={`money-input ${lowConfidence !== undefined ? 'low-conf' : ''} ${className}`} title={lowConfidence !== undefined ? `Low OCR confidence (${lowConfidence}%) — please check` : undefined}>
-      <span className="money-prefix" aria-hidden="true">₹</span>
+    <span
+      className={`money-input ${lowConfidence !== undefined ? 'low-conf' : ''} ${className}`}
+      title={lowConfidence !== undefined ? `Low OCR confidence (${lowConfidence}%) — please check` : undefined}
+    >
+      <span className="money-prefix" aria-hidden="true">
+        ₹
+      </span>
       <input
         id={id}
         aria-label={label}

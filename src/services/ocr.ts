@@ -18,7 +18,7 @@ export interface OcrResult {
   meanConfidence: number;
 }
 
-type TesseractWorker = Awaited<ReturnType<typeof import('tesseract.js')['createWorker']>>;
+type TesseractWorker = Awaited<ReturnType<(typeof import('tesseract.js'))['createWorker']>>;
 
 let workerPromise: Promise<TesseractWorker> | null = null;
 let progressListener: ((p: OcrProgress) => void) | null = null;

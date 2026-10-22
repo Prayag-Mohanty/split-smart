@@ -163,10 +163,12 @@ export function SummaryStep({ group, draft, update, onBack, onSave, onDelete }: 
         <details className="small muted">
           <summary>How is this calculated?</summary>
           <p>
-            Each item is split equally between the people who had it. Tax, service charge and discounts are then shared in proportion to each person's item subtotal — so someone whose items are 60% of the bill pays 60% of the tax.
+            Each item is split equally between the people who had it. Tax, service charge and discounts are then shared in proportion to each person's item
+            subtotal — so someone whose items are 60% of the bill pays 60% of the tax.
           </p>
           <p>
-            Rounding: amounts are rounded down to the paisa, and the few leftover paise go to whoever lost the largest fraction (ties go to the person listed first in the group), so the shares always add up exactly.
+            Rounding: amounts are rounded down to the paisa, and the few leftover paise go to whoever lost the largest fraction (ties go to the person listed
+            first in the group), so the shares always add up exactly.
           </p>
         </details>
       </div>

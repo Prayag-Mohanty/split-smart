@@ -89,7 +89,13 @@ export function simplifyDebts(balances: Record<MemberId, Paise>, order?: readonl
 
   const groups = ids.length <= EXACT_LIMIT ? zeroSumPartition(ids.map((id) => balances[id])) : [ids.map((_, i) => i)];
   const transfers: Transfer[] = [];
-  for (const g of groups) transfers.push(...greedySettle(g.map((i) => ids[i]), balances));
+  for (const g of groups)
+    transfers.push(
+      ...greedySettle(
+        g.map((i) => ids[i]),
+        balances,
+      ),
+    );
   return transfers;
 }
 
@@ -145,8 +151,7 @@ function greedySettle(ids: readonly MemberId[], balances: Record<MemberId, Paise
   const rank = new Map(ids.map((id, i) => [id, i]));
   const creditors = ids.filter((id) => balances[id] > 0).map((id) => ({ id, amt: balances[id] }));
   const debtors = ids.filter((id) => balances[id] < 0).map((id) => ({ id, amt: -balances[id] }));
-  const byAmount = (a: { id: string; amt: number }, b: { id: string; amt: number }) =>
-    b.amt - a.amt || rank.get(a.id)! - rank.get(b.id)!;
+  const byAmount = (a: { id: string; amt: number }, b: { id: string; amt: number }) => b.amt - a.amt || rank.get(a.id)! - rank.get(b.id)!;
   const out: Transfer[] = [];
   while (creditors.length && debtors.length) {
     creditors.sort(byAmount);
@@ -169,7 +174,10 @@ function greedySettle(ids: readonly MemberId[], balances: Record<MemberId, Paise
  */
 export function suggestSettlements(group: Group): Transfer[] {
   if (group.simplifyDebts === false) return rawDebts(group);
-  return simplifyDebts(computeNetBalances(group), group.members.map((m) => m.id));
+  return simplifyDebts(
+    computeNetBalances(group),
+    group.members.map((m) => m.id),
+  );
 }
 
 /** Total spent in a group (sum of all expense totals). */

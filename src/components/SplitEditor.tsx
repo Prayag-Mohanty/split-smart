@@ -17,11 +17,20 @@ export function defaultValues(mode: SplitMode, participants: string[], totalPais
   const n = participants.length;
   if (n === 0) return {};
   if (mode === 'exact') {
-    const parts = totalPaise > 0 ? allocate(totalPaise, participants.map(() => 1)) : participants.map(() => 0);
+    const parts =
+      totalPaise > 0
+        ? allocate(
+            totalPaise,
+            participants.map(() => 1),
+          )
+        : participants.map(() => 0);
     return Object.fromEntries(participants.map((id, i) => [id, parts[i]]));
   }
   if (mode === 'percent') {
-    const basis = allocate(10000, participants.map(() => 1)); // hundredths of a percent
+    const basis = allocate(
+      10000,
+      participants.map(() => 1),
+    ); // hundredths of a percent
     return Object.fromEntries(participants.map((id, i) => [id, basis[i] / 100]));
   }
   if (mode === 'shares') return Object.fromEntries(participants.map((id) => [id, 1]));
@@ -44,8 +53,14 @@ export function SplitEditor({ members, totalPaise, value, onChange, modes }: Spl
 
   const setMode = (m: SplitMode) => onChange({ mode: m, participants, values: defaultValues(m, participants, totalPaise) });
   const toggle = (id: string) => {
-    const next = participants.includes(id) ? participants.filter((p) => p !== id) : members.map((m) => m.id).filter((m) => m === id || participants.includes(m));
-    onChange({ mode, participants: next, values: mode === 'equal' ? {} : { ...defaultValues(mode, next, totalPaise), ...(mode === 'shares' ? pick(values, next) : {}) } });
+    const next = participants.includes(id)
+      ? participants.filter((p) => p !== id)
+      : members.map((m) => m.id).filter((m) => m === id || participants.includes(m));
+    onChange({
+      mode,
+      participants: next,
+      values: mode === 'equal' ? {} : { ...defaultValues(mode, next, totalPaise), ...(mode === 'shares' ? pick(values, next) : {}) },
+    });
   };
   const setValue = (id: string, v: number) => onChange({ ...value, values: { ...values, [id]: v } });
 
@@ -74,7 +89,9 @@ export function SplitEditor({ members, totalPaise, value, onChange, modes }: Spl
                 <Avatar member={m} size="sm" dim={!on} />
                 <span>{m.name}</span>
               </label>
-              {on && mode === 'exact' && <MoneyInput value={values[m.id]} onChange={(p) => setValue(m.id, p ?? 0)} label={`${m.name}'s amount`} className="compact" />}
+              {on && mode === 'exact' && (
+                <MoneyInput value={values[m.id]} onChange={(p) => setValue(m.id, p ?? 0)} label={`${m.name}'s amount`} className="compact" />
+              )}
               {on && (mode === 'percent' || mode === 'shares') && (
                 <span className="num-input">
                   <input

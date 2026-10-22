@@ -105,7 +105,14 @@ export function ExpensesTab({ group }: { group: Group }) {
           {usedCategories.length > 1 && (
             <div className="filter-row" role="radiogroup" aria-label="Filter by category">
               {(['All', ...usedCategories] as const).map((c) => (
-                <button key={c} type="button" role="radio" aria-checked={activeFilter === c} className={`chip-btn${activeFilter === c ? ' active' : ''}`} onClick={() => setFilter(c)}>
+                <button
+                  key={c}
+                  type="button"
+                  role="radio"
+                  aria-checked={activeFilter === c}
+                  className={`chip-btn${activeFilter === c ? ' active' : ''}`}
+                  onClick={() => setFilter(c)}
+                >
                   {c !== 'All' && <span aria-hidden="true">{CATEGORY_META[c].emoji} </span>}
                   {c}
                 </button>
@@ -114,7 +121,9 @@ export function ExpensesTab({ group }: { group: Group }) {
           )}
           {sections.length === 0 && (
             <p className="muted center-text">
-              {query ? `No ${activeFilter === 'All' ? '' : `${activeFilter.toLowerCase()} `}expenses match “${query}”.` : `No ${activeFilter.toLowerCase()} expenses.`}
+              {query
+                ? `No ${activeFilter === 'All' ? '' : `${activeFilter.toLowerCase()} `}expenses match “${query}”.`
+                : `No ${activeFilter.toLowerCase()} expenses.`}
             </p>
           )}
           {query && sections.length > 0 && (
@@ -124,7 +133,9 @@ export function ExpensesTab({ group }: { group: Group }) {
           )}
           {sections.map((s) => (
             <section key={s.date} className="expense-section">
-              <h3 className="date-heading">{new Date(s.date).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</h3>
+              <h3 className="date-heading">
+                {new Date(s.date).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+              </h3>
               <ul className="card list">
                 {s.list.map((e) => {
                   const payer = byId.get(e.payerId);

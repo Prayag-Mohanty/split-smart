@@ -13,9 +13,27 @@ export const CATEGORY_META: Record<Category, { emoji: string; color: string }> =
   Other: { emoji: '📦', color: '#64748b' },
 };
 
-export function CategorySelect({ value, onChange, id, label = 'Category', compact }: { value: Category; onChange: (c: Category) => void; id?: string; label?: string; compact?: boolean }) {
+export function CategorySelect({
+  value,
+  onChange,
+  id,
+  label = 'Category',
+  compact,
+}: {
+  value: Category;
+  onChange: (c: Category) => void;
+  id?: string;
+  label?: string;
+  compact?: boolean;
+}) {
   return (
-    <select id={id} aria-label={label} className={`select${compact ? ' select-compact' : ''}`} value={value} onChange={(e) => onChange(e.target.value as Category)}>
+    <select
+      id={id}
+      aria-label={label}
+      className={`select${compact ? ' select-compact' : ''}`}
+      value={value}
+      onChange={(e) => onChange(e.target.value as Category)}
+    >
       {CATEGORIES.map((c) => (
         <option key={c} value={c}>
           {CATEGORY_META[c].emoji} {c}

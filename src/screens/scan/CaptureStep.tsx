@@ -62,7 +62,8 @@ export function CaptureStep({ preview, error, queueLength, onFiles, onRotate, on
   return (
     <div className="stack-lg">
       {error && <Banner tone="error">{error}</Banner>}
-      {cameraMessage && <Banner tone="warn">{cameraMessage}</Banner>}
+      {/* While the camera dialog is open it shows the message itself; don't repeat it behind the dialog. */}
+      {cameraMessage && !cameraOpen && <Banner tone="warn">{cameraMessage}</Banner>}
       <div
         className={`dropzone${dragging ? ' dragging' : ''}`}
         onDragOver={(e) => {

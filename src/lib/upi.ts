@@ -5,7 +5,7 @@
  */
 import { toDecimalString, type Paise } from './money';
 
-const VPA_RE = /^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z][a-zA-Z0-9.\-]{1,64}$/;
+const VPA_RE = /^[a-zA-Z0-9._-]{2,256}@[a-zA-Z][a-zA-Z0-9.-]{1,64}$/;
 
 export function isValidVpa(vpa: string): boolean {
   return VPA_RE.test(vpa.trim());

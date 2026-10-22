@@ -15,12 +15,7 @@ interface AvatarProps {
 
 export function Avatar({ member, size = 'md', dim }: AvatarProps) {
   return (
-    <span
-      className={`avatar avatar-${size}${dim ? ' avatar-dim' : ''}`}
-      style={{ background: member.color }}
-      aria-hidden="true"
-      title={member.name}
-    >
+    <span className={`avatar avatar-${size}${dim ? ' avatar-dim' : ''}`} style={{ background: member.color }} aria-hidden="true" title={member.name}>
       {member.emoji || initials(member.name)}
     </span>
   );

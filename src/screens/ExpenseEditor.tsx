@@ -58,8 +58,10 @@ function Editor({ groupId, existing }: { groupId: string; existing?: ManualExpen
     if (!text.trim()) return;
     setSuggesting(true);
     try {
-      const [c] = await categorize([text]);
-      setCategory((cur) => (categoryTouched ? cur : c));
+      const {
+        categories: [c],
+      } = await categorize([text]);
+      if (c) setCategory((cur) => (categoryTouched ? cur : c));
     } catch {
       /* model unavailable (offline?) — keep the manual choice */
     } finally {
@@ -160,7 +162,13 @@ function Editor({ groupId, existing }: { groupId: string; existing?: ManualExpen
                     setCategoryTouched(true);
                   }}
                 />
-                <button type="button" className="btn" onClick={() => suggestCategory(description)} disabled={!description.trim() || suggesting} title="Suggest a category with the on-device model">
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => suggestCategory(description)}
+                  disabled={!description.trim() || suggesting}
+                  title="Suggest a category with the on-device model"
+                >
                   <Icon name="sparkle" size={16} /> Suggest
                 </button>
               </div>
@@ -172,7 +180,14 @@ function Editor({ groupId, existing }: { groupId: string; existing?: ManualExpen
               <legend>Paid by</legend>
               <div className="payer-picker" role="radiogroup" aria-label="Paid by">
                 {group.members.map((m) => (
-                  <button key={m.id} type="button" role="radio" aria-checked={payerId === m.id} className={`payer${payerId === m.id ? ' selected' : ''}`} onClick={() => setPayerId(m.id)}>
+                  <button
+                    key={m.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={payerId === m.id}
+                    className={`payer${payerId === m.id ? ' selected' : ''}`}
+                    onClick={() => setPayerId(m.id)}
+                  >
                     <Avatar member={m} size="sm" />
                     {m.id === group.meId ? `${m.name} (you)` : m.name}
                   </button>
@@ -195,7 +210,12 @@ function Editor({ groupId, existing }: { groupId: string; existing?: ManualExpen
                   <span className="row-title">Repeat automatically</span>
                   <span className="row-sub">For bills like a monthly Wi-Fi recharge</span>
                 </span>
-                <select className="select select-compact" value={repeat} onChange={(e) => setRepeat(e.target.value as RecurrenceFrequency | '')} aria-label="Repeat">
+                <select
+                  className="select select-compact"
+                  value={repeat}
+                  onChange={(e) => setRepeat(e.target.value as RecurrenceFrequency | '')}
+                  aria-label="Repeat"
+                >
                   <option value="">Never</option>
                   <option value="weekly">Weekly</option>
                   <option value="monthly">Monthly</option>

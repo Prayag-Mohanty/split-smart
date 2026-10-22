@@ -2,7 +2,12 @@
 export function uid(prefix = ''): string {
   const bytes = new Uint8Array(8);
   (globalThis.crypto ?? { getRandomValues: (b: Uint8Array) => b.map(() => Math.floor(Math.random() * 256)) }).getRandomValues(bytes);
-  return prefix + Array.from(bytes, (b) => b.toString(36).padStart(2, '0')).join('').slice(0, 12);
+  return (
+    prefix +
+    Array.from(bytes, (b) => b.toString(36).padStart(2, '0'))
+      .join('')
+      .slice(0, 12)
+  );
 }
 
 /** Today as yyyy-mm-dd in the user's local time zone. */

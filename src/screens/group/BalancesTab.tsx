@@ -45,7 +45,13 @@ export function BalancesTab({ group }: { group: Group }) {
   const setSimplifyDebts = useStore((s) => s.setSimplifyDebts);
   // How many payments simplification would need, to show what turning it on saves.
   const minimum = useMemo(
-    () => (simplifying ? transfers.length : simplifyDebts(computeNetBalances(group), group.members.map((m) => m.id)).length),
+    () =>
+      simplifying
+        ? transfers.length
+        : simplifyDebts(
+            computeNetBalances(group),
+            group.members.map((m) => m.id),
+          ).length,
     [group, simplifying, transfers.length],
   );
 
@@ -99,7 +105,8 @@ export function BalancesTab({ group }: { group: Group }) {
           </p>
           {!simplifying && minimum < transfers.length && (
             <Banner tone="info">
-              Turning on <strong>Simplify group debts</strong> would settle everything in {minimum} payment{minimum === 1 ? '' : 's'} instead of {transfers.length}.
+              Turning on <strong>Simplify group debts</strong> would settle everything in {minimum} payment{minimum === 1 ? '' : 's'} instead of{' '}
+              {transfers.length}.
               <div className="banner-actions">
                 <button type="button" className="btn btn-sm btn-primary" onClick={() => setSimplifyDebts(group.id, true)}>
                   Simplify debts
@@ -163,7 +170,12 @@ export function BalancesTab({ group }: { group: Group }) {
                   </div>
                   <div className="diverge" aria-hidden="true">
                     <span className="diverge-axis" />
-                    {s.net !== 0 && <span className={`diverge-bar ${s.net > 0 ? 'pos-bg' : 'owe-bg'}`} style={s.net > 0 ? { left: '50%', width: `${pct}%` } : { right: '50%', width: `${pct}%` }} />}
+                    {s.net !== 0 && (
+                      <span
+                        className={`diverge-bar ${s.net > 0 ? 'pos-bg' : 'owe-bg'}`}
+                        style={s.net > 0 ? { left: '50%', width: `${pct}%` } : { right: '50%', width: `${pct}%` }}
+                      />
+                    )}
                   </div>
                   <div className="small muted">
                     Paid {formatINR(s.paid)} · Share {formatINR(s.consumed)}
@@ -250,7 +262,8 @@ function UpiModal({ transfer, group, onClose, onSettled }: { transfer: Transfer 
   /** Set after "Open UPI app": we ask whether the payment went through when the user returns. */
   const [askConfirm, setAskConfirm] = useState(false);
 
-  const link = transfer && to?.upiId ? buildUpiLink({ payeeVpa: to.upiId, payeeName: to.name, amountPaise: transfer.amountPaise, note: `SplitSmart: ${group.name}` }) : '';
+  const link =
+    transfer && to?.upiId ? buildUpiLink({ payeeVpa: to.upiId, payeeName: to.name, amountPaise: transfer.amountPaise, note: `SplitSmart: ${group.name}` }) : '';
 
   useEffect(() => {
     setQr('');
@@ -289,7 +302,13 @@ function UpiModal({ transfer, group, onClose, onSettled }: { transfer: Transfer 
                   </div>
                 </div>
               )}
-              <div className="qr-box">{qr ? <img src={qr} alt={`UPI QR code to pay ${to.name} ${formatINR(transfer.amountPaise)}`} width={220} height={220} /> : <span className="muted">Generating QR…</span>}</div>
+              <div className="qr-box">
+                {qr ? (
+                  <img src={qr} alt={`UPI QR code to pay ${to.name} ${formatINR(transfer.amountPaise)}`} width={220} height={220} />
+                ) : (
+                  <span className="muted">Generating QR…</span>
+                )}
+              </div>
               <p className="small muted">Scan with any UPI app, or on a phone tap the button below. UPI ID: {to.upiId}</p>
               <p className="small muted">Some apps block pre-filled links opened from a browser — if so, scan the QR from another phone.</p>
               <div className="row-wrap center">
@@ -300,7 +319,10 @@ function UpiModal({ transfer, group, onClose, onSettled }: { transfer: Transfer 
                   type="button"
                   className="btn"
                   onClick={() => {
-                    navigator.clipboard?.writeText(link).then(() => toast('UPI link copied'), () => toast('Could not copy', 'error'));
+                    navigator.clipboard?.writeText(link).then(
+                      () => toast('UPI link copied'),
+                      () => toast('Could not copy', 'error'),
+                    );
                   }}
                 >
                   <Icon name="link" size={16} /> Copy link
