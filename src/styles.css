@@ -2969,3 +2969,14 @@ a.group-strip:hover {
   width: 52px;
   text-align: right;
 }
+
+.multi-payer-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 0;
+}
+.single-payer-btn {
+  align-self: flex-start;
+}
