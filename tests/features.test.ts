@@ -153,3 +153,71 @@ describe('category keyword hints', () => {
     expect(categoryHint('Xyz 123')).toBeUndefined();
   });
 });
+
+import { expensePayers, mainPayer, paidByPhrase, payerFields, validatePayers } from '../src/lib/payers';
+
+describe('several people paying one bill', () => {
+  // ₹900 dinner for Riya, Arjun and Meera (₹300 each); Riya paid ₹500 and Arjun ₹400.
+  const shared: Group = {
+    ...base,
+    expenses: [{ ...manual('d', 'Dinner', 'r', 90000), payers: { r: 50000, a: 40000 } }],
+  };
+
+  it('credits each payer with what they paid', () => {
+    expect(computeNetBalances(shared)).toEqual({ r: 20000, a: 10000, m: -30000 });
+    expect(suggestSettlements(shared)).toEqual([
+      { fromId: 'm', toId: 'r', amountPaise: 20000 },
+      { fromId: 'm', toId: 'a', amountPaise: 10000 },
+    ]);
+  });
+
+  it('splits each share between the payers in proportion for person-to-person debts', () => {
+    const raw = rawDebts({ ...shared, simplifyDebts: false });
+    const b = { r: 0, a: 0, m: 0 } as Record<string, number>;
+    for (const t of raw) {
+      b[t.fromId] += t.amountPaise;
+      b[t.toId] -= t.amountPaise;
+    }
+    expect(b).toEqual({ r: -20000, a: -10000, m: 30000 });
+  });
+
+  it('validates that the amounts paid add up to the bill', () => {
+    expect(validatePayers(90000, { r: 50000, a: 40000 })).toBeNull();
+    expect(validatePayers(90000, { r: 50000, a: 30000 })).toMatch(/short by ₹100.00/);
+    expect(validatePayers(90000, { r: 0 })).toMatch(/at least one/);
+  });
+
+  it('stores one payer as payerId only, several as payers plus the main payer', () => {
+    expect(payerFields({ r: 90000, a: 0 }, ['r', 'a'])).toEqual({ payerId: 'r' });
+    expect(payerFields({ r: 40000, a: 50000 }, ['r', 'a'])).toEqual({ payerId: 'a', payers: { r: 40000, a: 50000 } });
+    expect(mainPayer({ r: 100, a: 100 }, ['a', 'r'])).toBe('a');
+  });
+
+  it('describes who paid', () => {
+    expect(paidByPhrase(shared, shared.expenses[0])).toBe('You and Arjun paid');
+    expect(expensePayers(base.expenses[0])).toEqual({ a: 30000 });
+  });
+
+  it('person-to-person debts match the balances exactly, to the paisa (random bills)', () => {
+    let seed = 7;
+    const rnd = (n: number) => Math.floor(((seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31) * n);
+    for (let trial = 0; trial < 200; trial++) {
+      const ids = ['r', 'a', 'm'];
+      const expenses: Expense[] = Array.from({ length: 1 + rnd(4) }, (_, k) => {
+        const total = 1 + rnd(100000);
+        const first = rnd(total + 1);
+        const second = rnd(total - first + 1);
+        const payers = { r: first, a: second, m: total - first - second };
+        return { ...manual(`e${k}`, 'x', 'r', total, [...new Set(ids.filter(() => rnd(3) > 0).concat('m'))]), payers };
+      });
+      const g: Group = { ...base, expenses, simplifyDebts: false };
+      const b: Record<string, number> = { r: 0, a: 0, m: 0 };
+      for (const t of rawDebts(g)) {
+        b[t.fromId] += t.amountPaise;
+        b[t.toId] -= t.amountPaise;
+      }
+      const nets = computeNetBalances(g);
+      expect(b).toEqual({ r: -nets.r, a: -nets.a, m: -nets.m });
+    }
+  });
+});

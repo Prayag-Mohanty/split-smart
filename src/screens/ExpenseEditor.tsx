@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { AppBar } from '../components/AppBar';
-import { Avatar } from '../components/Avatar';
 import { Icon } from '../components/Icon';
 import { MoneyInput } from '../components/MoneyInput';
+import { PayerPicker, type PayerValue } from '../components/PayerPicker';
 import { SplitEditor } from '../components/SplitEditor';
 import { toast } from '../components/Toast';
 import { Banner, CategorySelect } from '../components/ui';
@@ -10,6 +10,7 @@ import { useClassifierStatus } from '../hooks/useCategorizer';
 import { navigate } from '../hooks/useHashRoute';
 import { todayIso, uid } from '../lib/ids';
 import { initialSplit } from '../lib/defaultSplit';
+import { payerFields, validatePayers } from '../lib/payers';
 import { nextOccurrence } from '../lib/recurring';
 import { validateSplit } from '../lib/split';
 import type { Category, ManualExpense, RecurrenceFrequency, SplitSpec } from '../lib/types';
@@ -35,7 +36,7 @@ function Editor({ groupId, existing }: { groupId: string; existing?: ManualExpen
 
   const [description, setDescription] = useState(existing?.description ?? '');
   const [total, setTotal] = useState<number | undefined>(existing?.totalPaise);
-  const [payerId, setPayerId] = useState(existing?.payerId ?? start.payerId);
+  const [payer, setPayer] = useState<PayerValue>({ payerId: existing?.payerId ?? start.payerId, payers: existing?.payers });
   const [date, setDate] = useState(existing?.date ?? todayIso());
   const [category, setCategory] = useState<Category>(existing?.category ?? 'Other');
   const [categoryTouched, setCategoryTouched] = useState(!!existing);
@@ -49,7 +50,7 @@ function Editor({ groupId, existing }: { groupId: string; existing?: ManualExpen
   const errors = {
     description: !description.trim() ? 'Add a short description.' : '',
     total: !total || total <= 0 ? 'Enter an amount greater than zero.' : '',
-    payer: !payerId ? 'Choose who paid.' : '',
+    payer: !payer.payerId ? 'Choose who paid.' : payer.payers ? (validatePayers(total ?? 0, payer.payers) ?? '') : '',
     split: splitError ?? '',
   };
   const valid = !Object.values(errors).some(Boolean);
@@ -77,12 +78,14 @@ function Editor({ groupId, existing }: { groupId: string; existing?: ManualExpen
     if (!existing && repeat) {
       recurringId = uid('r_');
     }
+    const order = group.members.map((m) => m.id);
+    const paidBy = payer.payers ? payerFields(payer.payers, order) : { payerId: payer.payerId };
     const expense: ManualExpense = {
       id,
       kind: 'manual',
       description: description.trim(),
       totalPaise: total,
-      payerId,
+      ...paidBy,
       date,
       category,
       split,
@@ -95,7 +98,8 @@ function Editor({ groupId, existing }: { groupId: string; existing?: ManualExpen
         id: recurringId,
         description: expense.description,
         totalPaise: total,
-        payerId,
+        // Recurring copies are credited to one payer (whoever paid the most this time).
+        payerId: paidBy.payerId,
         category,
         split,
         frequency: repeat,
@@ -178,22 +182,9 @@ function Editor({ groupId, existing }: { groupId: string; existing?: ManualExpen
           <div className="card stack">
             <fieldset className="field">
               <legend>Paid by</legend>
-              <div className="payer-picker" role="radiogroup" aria-label="Paid by">
-                {group.members.map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={payerId === m.id}
-                    className={`payer${payerId === m.id ? ' selected' : ''}`}
-                    onClick={() => setPayerId(m.id)}
-                  >
-                    <Avatar member={m} size="sm" />
-                    {m.id === group.meId ? `${m.name} (you)` : m.name}
-                  </button>
-                ))}
-              </div>
+              <PayerPicker members={group.members} meId={group.meId} totalPaise={total ?? 0} value={payer} onChange={setPayer} />
             </fieldset>
+            {submitted && errors.payer && <Banner tone="error">{errors.payer}</Banner>}
           </div>
 
           <div className="card stack">

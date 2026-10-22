@@ -61,7 +61,8 @@ export async function downloadGroupPdf(group: Group): Promise<void> {
   line('Expenses', { size: 13, bold: true });
   row(['Date', 'Description', 'Paid by', 'Amount'], [left, 120, 330, 540], true);
   for (const e of [...group.expenses].sort((a, b) => a.date.localeCompare(b.date))) {
-    row([e.date, e.description.slice(0, 36), name(e.payerId), money(expenseTotal(e))], [left, 120, 330, 540]);
+    const paidBy = e.payers ? `${Object.keys(e.payers).length} people` : name(e.payerId);
+    row([e.date, e.description.slice(0, 36), paidBy, money(expenseTotal(e))], [left, 120, 330, 540]);
   }
 
   doc.save(`${group.name.replace(/[^\w-]+/g, '_')}-settlement.pdf`);

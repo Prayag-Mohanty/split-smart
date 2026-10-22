@@ -19,7 +19,8 @@
  * the whole group, which is never more than n − 1 payments.
  */
 import type { Paise } from './money';
-import { expenseShares, expenseTotal } from './split';
+import { expensePayers } from './payers';
+import { allocate, expenseShares, expenseTotal } from './split';
 import type { Group, MemberId } from './types';
 
 export interface Transfer {
@@ -48,10 +49,12 @@ export function computeMemberStats(group: Group): Record<MemberId, MemberStats> 
     const shares = expenseShares(expense, order);
     const shareIds = Object.keys(shares);
     if (shareIds.length === 0) continue; // invalid expense: ignore rather than corrupt balances
-    const total = expenseTotal(expense);
-    const payer = get(expense.payerId);
-    payer.paid += total;
-    payer.net += total;
+    // Several people may have paid part of the bill.
+    for (const [id, amount] of Object.entries(expensePayers(expense))) {
+      const payer = get(id);
+      payer.paid += amount;
+      payer.net += amount;
+    }
     for (const id of shareIds) {
       const s = get(id);
       s.consumed += shares[id];
@@ -202,7 +205,19 @@ export function rawDebts(group: Group): Transfer[] {
   };
   for (const e of group.expenses) {
     const shares = expenseShares(e, order);
-    for (const [id, share] of Object.entries(shares)) add(id, e.payerId, share);
+    // With several payers, each person's share is owed to the payers in proportion to what they
+    // paid. Shares are taken from each payer's *remaining* amount so every payer ends up owed
+    // exactly what they paid (rounding can't drift by a paisa across people).
+    const paid = Object.entries(expensePayers(e)).sort(([a], [b]) => (rank.get(a) ?? 1e9) - (rank.get(b) ?? 1e9));
+    const remaining = paid.map(([, v]) => v);
+    const consumers = Object.entries(shares).sort(([a], [b]) => (rank.get(a) ?? 1e9) - (rank.get(b) ?? 1e9));
+    for (const [id, share] of consumers) {
+      const parts = paid.length === 1 ? [share] : allocate(share, remaining);
+      paid.forEach(([payerId], k) => {
+        remaining[k] -= parts[k];
+        add(id, payerId, parts[k]);
+      });
+    }
   }
   for (const s of group.settlements) add(s.toId, s.fromId, s.amountPaise); // a payment cancels debt from→to
   const out: Transfer[] = [];

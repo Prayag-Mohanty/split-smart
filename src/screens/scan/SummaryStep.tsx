@@ -4,8 +4,9 @@ import { Icon } from '../../components/Icon';
 import { toast } from '../../components/Toast';
 import { Banner, CategorySelect } from '../../components/ui';
 import { formatINR } from '../../lib/money';
+import { expensePayers, payersDetail, validatePayers } from '../../lib/payers';
 import { personName } from '../../lib/people';
-import { suggestSettlements } from '../../lib/settle';
+import { simplifyDebts, suggestSettlements } from '../../lib/settle';
 import { computeItemizedSplit } from '../../lib/split';
 import type { Group } from '../../lib/types';
 import { dominantCategory, draftToExpense, type Draft } from './draft';
@@ -29,13 +30,21 @@ export function SummaryStep({ group, draft, update, onBack, onSave, onDelete }: 
   const category = draft.categoryLocked ? draft.category : dominantCategory(draft.items);
   const [sharing, setSharing] = useState(false);
 
-  // What this bill means in money terms: who pays the payer, and the group's settle-up afterwards.
-  const owes = split.breakdown.filter((b) => b.memberId !== draft.payerId && b.totalPaise > 0);
+  const payersError = draft.payers ? validatePayers(split.billTotal, draft.payers) : null;
+  const expense = useMemo(() => draftToExpense(draft, Date.now(), order), [draft, order]);
+
+  // What this bill means in money terms: who pays whom for it, and the group's settle-up afterwards.
+  const billTransfers = useMemo(() => {
+    if (!split.ok || payersError) return [];
+    const nets: Record<string, number> = {};
+    for (const [id, paid] of Object.entries(expensePayers(expense))) nets[id] = (nets[id] ?? 0) + paid;
+    for (const [id, share] of Object.entries(split.shares)) nets[id] = (nets[id] ?? 0) - share;
+    return simplifyDebts(nets, order);
+  }, [expense, split.ok, split.shares, payersError, order]);
   const groupAfter = useMemo(() => {
-    if (!split.ok) return [];
-    const expense = draftToExpense(draft);
+    if (!split.ok || payersError) return [];
     return suggestSettlements({ ...group, expenses: [expense, ...group.expenses.filter((e) => e.id !== expense.id)] });
-  }, [group, draft, split.ok]);
+  }, [group, expense, split.ok, payersError]);
 
   const shareCard = async () => {
     if (!payer) return;
@@ -48,7 +57,13 @@ export function SummaryStep({ group, draft, update, onBack, onSave, onDelete }: 
         date: new Date(draft.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
         groupName: group.name,
         total: split.billTotal,
-        payer,
+        paidBy: draft.payers ? payersDetail(group, expense) : payer.name,
+        transfers: billTransfers.flatMap((t) => {
+          const from = byId.get(t.fromId);
+          const to = byId.get(t.toId);
+          return from && to ? [{ from, to, amount: t.amountPaise }] : [];
+        }),
+        paid: expensePayers(expense),
         shares: split.breakdown
           .filter((b) => byId.has(b.memberId))
           .map((b) => ({
@@ -75,19 +90,27 @@ export function SummaryStep({ group, draft, update, onBack, onSave, onDelete }: 
       <div className="card summary-hero">
         <span className="muted small">{draft.description || 'Receipt'}</span>
         <strong className="big-amount">{formatINR(split.billTotal)}</strong>
-        <label className="payer-chip">
-          {payer && <Avatar member={payer} size="sm" />}
-          <span>Paid by</span>
-          <select value={draft.payerId} onChange={(e) => update((d) => ({ ...d, payerId: e.target.value }))} aria-label="Paid by">
-            {group.members.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.id === group.meId ? `${m.name} (you)` : m.name}
-              </option>
-            ))}
-          </select>
-          <span aria-hidden="true">▾</span>
-        </label>
+        {draft.payers ? (
+          // Several payers are edited on the Assign step; here we just show them.
+          <button type="button" className="payer-chip" onClick={onBack} title="Change who paid">
+            <span>Paid by</span> <strong>{payersError ? 'several people' : payersDetail(group, expense)}</strong> <span aria-hidden="true">✎</span>
+          </button>
+        ) : (
+          <label className="payer-chip">
+            {payer && <Avatar member={payer} size="sm" />}
+            <span>Paid by</span>
+            <select value={draft.payerId} onChange={(e) => update((d) => ({ ...d, payerId: e.target.value }))} aria-label="Paid by">
+              {group.members.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.id === group.meId ? `${m.name} (you)` : m.name}
+                </option>
+              ))}
+            </select>
+            <span aria-hidden="true">▾</span>
+          </label>
+        )}
       </div>
+      {payersError && <Banner tone="error">{payersError} Go back to Assign to fix who paid.</Banner>}
 
       <div className="card">
         <h2 className="card-title">Each person's share</h2>
@@ -146,13 +169,13 @@ export function SummaryStep({ group, draft, update, onBack, onSave, onDelete }: 
             <Icon name="check" size={14} /> Shares add up exactly to {formatINR(split.billTotal)}.
           </p>
         )}
-        {split.ok && owes.length > 0 && (
+        {split.ok && billTransfers.length > 0 && (
           <div className="consequence">
             <strong>For this bill:</strong>{' '}
-            {owes.map((b, i) => (
-              <span key={b.memberId}>
+            {billTransfers.map((t, i) => (
+              <span key={`${t.fromId}-${t.toId}`}>
                 {i > 0 && ' · '}
-                {personName(group, b.memberId)} → {personName(group, draft.payerId)} {formatINR(b.totalPaise)}
+                {personName(group, t.fromId)} → {personName(group, t.toId)} {formatINR(t.amountPaise)}
               </span>
             ))}
             <div className="small muted">
@@ -195,7 +218,7 @@ export function SummaryStep({ group, draft, update, onBack, onSave, onDelete }: 
         <button type="button" className="btn btn-lg" onClick={onBack}>
           <Icon name="back" /> Assign
         </button>
-        <button type="button" className="btn btn-primary btn-lg" disabled={!split.ok} onClick={onSave}>
+        <button type="button" className="btn btn-primary btn-lg" disabled={!split.ok || !!payersError} onClick={onSave}>
           <Icon name="check" /> Save split
         </button>
       </div>

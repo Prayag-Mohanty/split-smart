@@ -56,7 +56,10 @@ const updateGroup = (groups: Group[], id: string, fn: (g: Group) => Group) => gr
 export function memberInUse(group: Group, memberId: string): boolean {
   return (
     group.expenses.some(
-      (e) => e.payerId === memberId || (e.kind === 'manual' ? e.split.participants.includes(memberId) : e.items.some((i) => i.assignees.includes(memberId))),
+      (e) =>
+        e.payerId === memberId ||
+        (e.payers?.[memberId] ?? 0) > 0 ||
+        (e.kind === 'manual' ? e.split.participants.includes(memberId) : e.items.some((i) => i.assignees.includes(memberId))),
     ) ||
     group.settlements.some((s) => s.fromId === memberId || s.toId === memberId) ||
     group.recurring.some((r) => r.payerId === memberId || r.split.participants.includes(memberId))

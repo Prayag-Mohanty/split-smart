@@ -35,7 +35,9 @@ export function groupFromJson(text: string): Group {
   const memberIds = new Set(group.members.map((m) => m.id));
   const expenses = Array.isArray(group.expenses) ? group.expenses : [];
   for (const e of expenses) {
-    if (!memberIds.has(e.payerId)) throw new Error(`Expense "${e.description}" references an unknown payer.`);
+    if (!memberIds.has(e.payerId) || Object.keys(e.payers ?? {}).some((id) => !memberIds.has(id))) {
+      throw new Error(`Expense "${e.description}" references an unknown payer.`);
+    }
     if (!CATEGORIES.includes(e.category)) e.category = 'Other';
   }
   return {

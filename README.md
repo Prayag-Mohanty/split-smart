@@ -98,6 +98,7 @@ No training or fine-tuning, no paid APIs, no API keys. Receipt images never leav
 - **Expense search:** search by description, item name, person ("you" works too), ₹ amount or date, combined with the category filter.
 - **Simplify group debts (switch):** on by default (fewest payments). Off, each debt is repaid to the person who actually paid, and Balances shows how many payments simplifying would save.
 - **Settled groups start clean:** once everyone is settled up, the expense list folds into "You are all settled up in this group" with "Tap to show settled expenses"; search still finds everything.
+- **Several payers:** if a bill was paid by more than one person (e.g. Riya ₹500 + Arjun ₹340), enter what each paid; balances credit each payer and every share is owed to the payers in proportion, exact to the paisa.
 - **Default split:** set your own default payer and split (equal, % or shares) per group. It pre-fills new expenses, stays on your device and is never exported with the group.
 - **"You" everywhere:** your name is asked once and remembered. Balances read "You get back ₹672" / "You owe Riya ₹168", you're the default payer, and imported groups ask "Which one is you?".
 - **Watch the debts shrink:** an animated graph on Balances collapses every original IOU into the minimum set of payments ("5 IOUs → 3 payments"), making the settlement algorithm visible.
