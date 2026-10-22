@@ -1036,6 +1036,28 @@ a.list-row:hover {
   font-size: 20px;
   cursor: pointer;
 }
+.emoji-tabs {
+  padding-bottom: 2px;
+}
+.emoji-suggested {
+  display: grid;
+  gap: 4px;
+}
+.emoji-custom {
+  display: grid;
+  gap: 4px;
+  max-width: 220px;
+}
+.icon-pick-btn {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  font-size: 22px;
+  cursor: pointer;
+}
 .emoji-picker button.selected,
 .swatches button.selected {
   border-color: var(--brand);
