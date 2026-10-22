@@ -124,4 +124,6 @@ export interface Group {
   expenses: Expense[];
   settlements: Settlement[];
   recurring: RecurringExpense[];
+  /** Which member is the person using this device ("You"). Unset for imported groups until chosen. */
+  meId?: MemberId;
 }

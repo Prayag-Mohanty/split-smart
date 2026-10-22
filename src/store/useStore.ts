@@ -11,16 +11,21 @@ import type { Expense, Group, Member, RecurringExpense, Settlement } from '../li
 
 export interface Settings {
   autoCategorize: boolean;
+  /** The user's own name, remembered so new groups can add "you" automatically. */
+  myName?: string;
 }
 
 interface State {
   groups: Group[];
   settings: Settings;
 
-  createGroup: (name: string, memberNames?: string[], emoji?: string) => string;
+  /** `myName` (if given) becomes the first member and is marked as "you". */
+  createGroup: (name: string, memberNames?: string[], emoji?: string, myName?: string) => string;
+  setMe: (groupId: string, memberId: string | undefined) => void;
   renameGroup: (groupId: string, name: string, emoji?: string) => void;
   deleteGroup: (groupId: string) => void;
-  importGroup: (group: Group) => string;
+  /** Import a copy. `keepMe` keeps the group's "you" (used for the bundled demo). */
+  importGroup: (group: Group, opts?: { keepMe?: boolean }) => string;
 
   addMember: (groupId: string, member: Omit<Member, 'id' | 'color'> & { color?: string }) => string;
   updateMember: (groupId: string, memberId: string, patch: Partial<Omit<Member, 'id'>>) => void;
@@ -65,12 +70,16 @@ export const useStore = create<State>()(
       groups: [],
       settings: { autoCategorize: true },
 
-      createGroup: (name, memberNames = [], emoji) => {
+      createGroup: (name, memberNames = [], emoji, myName) => {
         const id = uid('g_');
-        const members = memberNames.filter((n) => n.trim()).map((n, i) => newMember(n, i));
+        const me = myName?.trim();
+        const others = memberNames.map((n) => n.trim()).filter((n) => n && n.toLowerCase() !== me?.toLowerCase());
+        const members = (me ? [me, ...others] : others).map((n, i) => newMember(n, i));
+        const meId = me ? members[0].id : undefined;
+        if (me) set((s) => ({ settings: { ...s.settings, myName: me } }));
         set((s) => ({
           groups: [
-            { id, name: name.trim(), emoji, createdAt: Date.now(), members, expenses: [], settlements: [], recurring: [] },
+            { id, name: name.trim(), emoji, createdAt: Date.now(), members, expenses: [], settlements: [], recurring: [], meId },
             ...s.groups,
           ],
         }));
@@ -79,10 +88,16 @@ export const useStore = create<State>()(
       renameGroup: (groupId, name, emoji) =>
         set((s) => ({ groups: updateGroup(s.groups, groupId, (g) => ({ ...g, name: name.trim() || g.name, emoji })) })),
       deleteGroup: (groupId) => set((s) => ({ groups: s.groups.filter((g) => g.id !== groupId) })),
-      importGroup: (group) => {
+      setMe: (groupId, memberId) => set((s) => ({ groups: updateGroup(s.groups, groupId, (g) => ({ ...g, meId: memberId })) })),
+      importGroup: (group, opts) => {
         // Always import as a new group so an import can never clobber local data.
+        // "You" on the sender's device is not you here, unless the remembered name matches.
         const id = uid('g_');
-        set((s) => ({ groups: [{ ...group, id, createdAt: Date.now() }, ...s.groups] }));
+        const myName = get().settings.myName?.toLowerCase();
+        const meId = opts?.keepMe
+          ? group.meId
+          : group.meId && group.members.some((m) => m.id === group.meId && m.name.toLowerCase() === myName) ? group.meId : group.members.find((m) => m.name.toLowerCase() === myName)?.id;
+        set((s) => ({ groups: [{ ...group, id, createdAt: Date.now(), meId }, ...s.groups] }));
         return id;
       },
 

@@ -12,11 +12,16 @@ const inrFormatter = new Intl.NumberFormat('en-IN', {
   maximumFractionDigits: 2,
 });
 
-/** Format paise as a rupee string, e.g. 123456 -> "₹1,234.56". */
-export function formatINR(paise: Paise, opts: { sign?: boolean; symbol?: boolean } = {}): string {
-  const { sign = false, symbol = true } = opts;
+const inrWholeFormatter = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 });
+
+/**
+ * Format paise as a rupee string, e.g. 123456 -> "₹1,234.56".
+ * `compact` drops ".00" for whole-rupee amounts (for headline numbers): 238000 -> "₹2,380".
+ */
+export function formatINR(paise: Paise, opts: { sign?: boolean; symbol?: boolean; compact?: boolean } = {}): string {
+  const { sign = false, symbol = true, compact = false } = opts;
   const abs = Math.abs(paise);
-  const body = inrFormatter.format(abs / 100);
+  const body = compact && abs % 100 === 0 ? inrWholeFormatter.format(abs / 100) : inrFormatter.format(abs / 100);
   const prefix = paise < 0 ? '−' : sign && paise > 0 ? '+' : '';
   return `${prefix}${symbol ? '₹' : ''}${body}`;
 }
