@@ -31,11 +31,11 @@ export default defineConfig({
         // App shell is precached; the heavy ML runtime (ONNX wasm, classifier worker) is cached
         // on first use instead, so installing the PWA never forces a 20 MB download.
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
-        globIgnores: ['**/classifier.worker-*.js', '**/*.wasm'],
+        globIgnores: ['**/classifier.worker-*.js', '**/*.wasm', 'ocr/**'],
         maximumFileSizeToCacheInBytes: 30 * 1024 * 1024,
         runtimeCaching: [
           {
-            urlPattern: ({ url, sameOrigin }) => sameOrigin && /\/assets\/.*\.(wasm|js|mjs)$/.test(url.pathname),
+            urlPattern: ({ url, sameOrigin }) => sameOrigin && /\/(assets|ocr)\/.*\.(wasm|js|mjs|gz)$/.test(url.pathname),
             handler: 'CacheFirst',
             options: { cacheName: 'app-lazy-assets', expiration: { maxEntries: 40 } },
           },

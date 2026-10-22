@@ -1117,7 +1117,7 @@ a.list-row:hover {
 .neg-bg {
   background: var(--neg);
 }
-.stack {
+ul.stack {
   list-style: none;
   padding: 0;
   margin: 0;
@@ -2050,4 +2050,14 @@ details summary {
   font-weight: 700;
   cursor: pointer;
   padding: 4px 6px;
+}
+
+.raw-text pre {
+  max-height: 240px;
+  overflow: auto;
+  background: var(--surface-2);
+  padding: 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  white-space: pre-wrap;
 }

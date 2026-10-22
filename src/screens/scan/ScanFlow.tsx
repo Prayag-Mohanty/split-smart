@@ -61,10 +61,13 @@ function Flow({ group, editing }: { group: Group; editing?: Extract<Group['expen
   const [categorizing, setCategorizing] = useState(false);
   const runId = useRef(0);
   const dirty = useRef(false);
+  /** True until the user rotates by hand; while true a poor read retries other orientations. */
+  const autoOrient = useRef(true);
 
   // Free memory when leaving the scanner.
   useEffect(() => () => void disposeOcr(), []);
   useEffect(() => () => void (preview && URL.revokeObjectURL(preview)), [preview]);
+  useEffect(() => () => void (image && URL.revokeObjectURL(image.url)), [image]);
 
   // Warn before closing the tab with unsaved edits.
   useEffect(() => {
@@ -86,7 +89,8 @@ function Flow({ group, editing }: { group: Group; editing?: Extract<Group['expen
     try {
       const bmp = await loadBitmap(file);
       setBitmap(bmp);
-      setRotation(bmp.width > bmp.height * 1.25 ? 90 : 0); // landscape photo of a tall receipt: guess it's sideways
+      setRotation(0);
+      autoOrient.current = true;
       setImage(null);
       setStep('capture');
     } catch (e) {
@@ -133,13 +137,29 @@ function Flow({ group, editing }: { group: Group; editing?: Extract<Group['expen
       setError('');
       setProgress({ stage: 'Enhancing image', progress: 0.01 });
       try {
-        const canvas = drawRotated(bitmap, rot);
-        const colourUrl = URL.createObjectURL(await canvasToBlob(canvas));
-        enhanceForOcr(canvas);
-        const result = await recognizeReceipt(canvas, (p) => id === runId.current && setProgress(p));
-        if (id !== runId.current) return;
-        const parsed = parseReceipt(result.lines);
-        setImage({ url: colourUrl, width: canvas.width, height: canvas.height, lines: result.lines, meanConfidence: result.meanConfidence });
+        // Read at the chosen rotation; if nothing sensible comes out and the user hasn't
+        // rotated manually, try the two sideways orientations and keep the best read.
+        const attempts: Rotation[] = autoOrient.current ? [rot, ((rot + 90) % 360) as Rotation, ((rot + 270) % 360) as Rotation] : [rot];
+        let best: { rot: Rotation; canvas: HTMLCanvasElement; result: Awaited<ReturnType<typeof recognizeReceipt>>; parsed: ReturnType<typeof parseReceipt>; score: number } | null = null;
+        for (const [n, r] of attempts.entries()) {
+          if (n > 0) setProgress({ stage: 'Trying another orientation', progress: 0.4 });
+          const canvas = drawRotated(bitmap, r);
+          enhanceForOcr(canvas);
+          const result = await recognizeReceipt(canvas, (p) => id === runId.current && setProgress(n > 0 ? { ...p, stage: `Trying ${r}° rotation` } : p));
+          if (id !== runId.current) return;
+          const parsed = parseReceipt(result.lines);
+          const score = parsed.items.length * 10 + (parsed.totalPaise !== undefined ? 15 : 0) + result.meanConfidence / 10;
+          if (!best || score > best.score) best = { rot: r, canvas, result, parsed, score };
+          if (parsed.items.length > 0 && result.meanConfidence >= 60) break;
+        }
+        if (!best) return;
+        const { result, parsed } = best;
+        if (best.rot !== rot) {
+          setRotation(best.rot);
+          toast(`The receipt looked sideways, so it was rotated ${best.rot}°`, 'info');
+        }
+        const colourUrl = URL.createObjectURL(await canvasToBlob(drawRotated(bitmap, best.rot)));
+        setImage({ url: colourUrl, width: best.canvas.width, height: best.canvas.height, lines: result.lines, meanConfidence: result.meanConfidence });
         const next = draftFromParsed(parsed, emptyDraft(draft.payerId, todayIso()));
         setDraft(next);
         dirty.current = true;
@@ -210,7 +230,10 @@ function Flow({ group, editing }: { group: Group; editing?: Extract<Group['expen
             preview={bitmap ? preview : ''}
             error={error}
             onFiles={addFiles}
-            onRotate={(delta) => setRotation((r) => (((r + delta + 360) % 360) as Rotation))}
+            onRotate={(delta) => {
+              autoOrient.current = false;
+              setRotation((r) => (((r + delta + 360) % 360) as Rotation));
+            }}
             onProcess={() => process()}
             onClear={() => {
               setBitmap(null);
@@ -230,6 +253,7 @@ function Flow({ group, editing }: { group: Group; editing?: Extract<Group['expen
             categorizing={categorizing}
             canRescan={!!bitmap}
             onRotate={(delta) => {
+              autoOrient.current = false;
               const r = (((rotation + delta + 360) % 360) as Rotation);
               setRotation(r);
               process(r);

@@ -99,7 +99,7 @@ export function CaptureStep({ preview, error, queueLength, onFiles, onRotate, on
       <ul className="tips small muted">
         <li>Lay the receipt flat in good light and fill the frame.</li>
         <li>Everything runs on your device — the photo is never uploaded.</li>
-        <li>The first scan downloads the OCR model (~10 MB); later scans are faster and work offline.</li>
+        <li>The first scan downloads the OCR model (~7 MB); later scans are faster and work offline.</li>
       </ul>
       <CameraCapture open={cameraOpen} onClose={closeCamera} onCapture={onCapture} onUnavailable={onUnavailable} />
     </div>

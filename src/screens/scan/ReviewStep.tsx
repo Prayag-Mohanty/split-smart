@@ -106,6 +106,10 @@ export function ReviewStep({ draft, update, image, categorizing, canRescan, onRo
                 <p className="small muted legend-inline">
                   <span className="legend-swatch low" /> low-confidence words · tap a row to locate it
                 </p>
+                <details className="small raw-text">
+                  <summary>Raw OCR text</summary>
+                  <pre>{image.lines.map((l) => l.text).join('\n') || '(no text found)'}</pre>
+                </details>
               </>
             )}
           </div>

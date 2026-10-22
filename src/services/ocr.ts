@@ -1,6 +1,6 @@
 /**
  * Tesseract.js wrapper. The library itself runs recognition inside a Web Worker, so the
- * UI thread stays responsive. The module (and the ~10 MB English model) is only loaded the
+ * UI thread stays responsive. The module (and the ~3 MB English model) is only loaded the
  * first time a receipt is scanned, and the model is cached in IndexedDB afterwards.
  */
 import type { OcrLine } from '../lib/receiptParser';
@@ -44,7 +44,12 @@ async function getWorker(): Promise<TesseractWorker> {
   if (!workerPromise) {
     workerPromise = (async () => {
       const { createWorker, PSM } = await import('tesseract.js');
+      // All OCR assets are self-hosted under ./ocr (copied from node_modules at build time).
+      const base = new URL('ocr/', document.baseURI).href;
       const worker = await createWorker('eng', 1, {
+        workerPath: `${base}worker.min.js`,
+        corePath: base,
+        langPath: base,
         logger: (m: { status: string; progress: number }) => report(m.status, m.progress),
       });
       await worker.setParameters({

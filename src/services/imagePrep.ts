@@ -52,28 +52,46 @@ export function drawRotated(bitmap: ImageBitmap, rotation: Rotation): HTMLCanvas
   return canvas;
 }
 
-/** Grayscale + percentile contrast stretch, in place. */
+/**
+ * Grayscale + local adaptive contrast, in place.
+ * Each pixel is compared with the mean brightness of its neighbourhood (Bradley's method,
+ * via an integral image). Pixels near the local paper colour become white and anything
+ * clearly darker is ramped to black. Unlike a global stretch this copes with faded thermal
+ * print, shadows and a table or background showing around the receipt.
+ */
 export function enhanceForOcr(canvas: HTMLCanvasElement): HTMLCanvasElement {
+  const { width: w, height: h } = canvas;
   const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
-  const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const img = ctx.getImageData(0, 0, w, h);
   const d = img.data;
-  const hist = new Uint32Array(256);
-  for (let i = 0; i < d.length; i += 4) {
-    const g = (d[i] * 299 + d[i + 1] * 587 + d[i + 2] * 114) / 1000;
-    d[i] = g;
-    hist[g | 0]++;
+  const gray = new Float32Array(w * h);
+  for (let i = 0, p = 0; p < gray.length; i += 4, p++) gray[p] = (d[i] * 299 + d[i + 1] * 587 + d[i + 2] * 114) / 1000;
+
+  // Integral image for O(1) window means.
+  const integral = new Float64Array((w + 1) * (h + 1));
+  for (let y = 1; y <= h; y++) {
+    let row = 0;
+    for (let x = 1; x <= w; x++) {
+      row += gray[(y - 1) * w + (x - 1)];
+      integral[y * (w + 1) + x] = integral[(y - 1) * (w + 1) + x] + row;
+    }
   }
-  // Stretch between the 2nd and 98th percentile so faded grey text becomes black.
-  const total = d.length / 4;
-  let lo = 0;
-  let hi = 255;
-  for (let acc = 0, i = 0; i < 256; i++) if ((acc += hist[i]) >= total * 0.02) { lo = i; break; }
-  for (let acc = 0, i = 255; i >= 0; i--) if ((acc += hist[i]) >= total * 0.02) { hi = i; break; }
-  const range = Math.max(1, hi - lo);
-  for (let i = 0; i < d.length; i += 4) {
-    let v = ((d[i] - lo) * 255) / range;
-    v = v < 0 ? 0 : v > 255 ? 255 : v;
-    d[i] = d[i + 1] = d[i + 2] = v;
+  const r = Math.max(8, Math.round(Math.max(w, h) / 40)); // window radius ≈ a few text lines
+  const WHITE_AT = 0.92; // ≥ 92% of the local mean reads as paper
+  const BLACK_AT = 0.6; // ≤ 60% of the local mean is solid ink
+  for (let y = 0; y < h; y++) {
+    const y0 = Math.max(0, y - r);
+    const y1 = Math.min(h, y + r + 1);
+    for (let x = 0; x < w; x++) {
+      const x0 = Math.max(0, x - r);
+      const x1 = Math.min(w, x + r + 1);
+      const sum = integral[y1 * (w + 1) + x1] - integral[y0 * (w + 1) + x1] - integral[y1 * (w + 1) + x0] + integral[y0 * (w + 1) + x0];
+      const mean = sum / ((x1 - x0) * (y1 - y0)) || 1;
+      const ratio = gray[y * w + x] / mean;
+      const v = ratio >= WHITE_AT ? 255 : ratio <= BLACK_AT ? 0 : ((ratio - BLACK_AT) / (WHITE_AT - BLACK_AT)) * 255;
+      const i = (y * w + x) * 4;
+      d[i] = d[i + 1] = d[i + 2] = v;
+    }
   }
   ctx.putImageData(img, 0, 0);
   return canvas;
