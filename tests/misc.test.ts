@@ -123,3 +123,21 @@ describe('analytics', () => {
     expect(t.map((x) => x.total)).toEqual([10001, 0, 110000]);
   });
 });
+
+import { gstLines, guessGstRate } from '../src/lib/gst';
+
+describe('GST helpers', () => {
+  it('splits a rate into equal CGST and SGST lines on the subtotal', () => {
+    expect(gstLines(237000, 5)).toEqual([
+      { label: 'CGST 2.5%', amountPaise: 5925 },
+      { label: 'SGST 2.5%', amountPaise: 5925 },
+    ]);
+    expect(gstLines(10000, 18)[0].label).toBe('CGST 9%');
+  });
+  it('guesses the GST slab from a missing amount', () => {
+    expect(guessGstRate(11850, 237000)).toBe(5);
+    expect(guessGstRate(11900, 237000)).toBe(5); // with round-off
+    expect(guessGstRate(42660, 237000)).toBe(18);
+    expect(guessGstRate(5000, 237000)).toBeUndefined();
+  });
+});

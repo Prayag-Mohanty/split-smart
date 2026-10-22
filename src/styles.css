@@ -2061,3 +2061,7 @@ details summary {
   font-size: 12px;
   white-space: pre-wrap;
 }
+
+.gst-quick {
+  padding-top: 4px;
+}

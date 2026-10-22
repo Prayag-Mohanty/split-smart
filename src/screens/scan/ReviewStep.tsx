@@ -3,6 +3,7 @@ import { Icon } from '../../components/Icon';
 import { MoneyInput } from '../../components/MoneyInput';
 import { Banner, CategorySelect } from '../../components/ui';
 import { useClassifierStatus } from '../../hooks/useCategorizer';
+import { GST_RATES, gstLines, guessGstRate } from '../../lib/gst';
 import { formatINR } from '../../lib/money';
 import { checkTotals, LOW_CONFIDENCE } from '../../lib/receiptParser';
 import { signedAdjustment } from '../../lib/split';
@@ -54,7 +55,27 @@ export function ReviewStep({ draft, update, image, categorizing, canRescan, onRo
 
   const confirmComputed = () => update((d) => ({ ...d, printedTotalPaise: check.computedPaise, totalSource: 'confirmed', totalLow: undefined }));
   const addDifference = () =>
-    update((d) => ({ ...d, adjustments: [...d.adjustments, newAdjustment('other', check.differencePaise > 0 ? 'Unmatched charges' : 'Unmatched reduction', check.differencePaise)] }));
+    update((d) => ({
+      ...d,
+      adjustments: [
+        ...d.adjustments,
+        newAdjustment('other', Math.abs(check.differencePaise) < 100 ? 'Round off' : check.differencePaise > 0 ? 'Unmatched charges' : 'Unmatched reduction', check.differencePaise),
+      ],
+    }));
+
+  // GST is charged on the items after any discount.
+  const gstBase = check.itemsPaise + draft.adjustments.filter((a) => a.kind === 'discount').reduce((s, a) => s + signedAdjustment(a), 0);
+  const hasTax = draft.adjustments.some((a) => a.kind === 'tax');
+  /** Replace any tax lines with CGST + SGST at a standard GST rate. */
+  const setGst = (rate: number) =>
+    update((d) => ({
+      ...d,
+      adjustments: [...d.adjustments.filter((a) => a.kind !== 'tax'), ...gstLines(gstBase, rate).map((l) => newAdjustment('tax', l.label, l.amountPaise))],
+    }));
+  // If the printed total minus everything except tax looks like a GST slab, offer it.
+  const taxPaise = draft.adjustments.filter((a) => a.kind === 'tax').reduce((sum, a) => sum + a.amountPaise, 0);
+  const suggestedRate =
+    draft.printedTotalPaise !== undefined && !check.matches ? guessGstRate(draft.printedTotalPaise - (check.computedPaise - taxPaise), gstBase) : undefined;
 
   const needsConfirm = !noItems && draft.totalSource === 'none';
   const mismatch = !noItems && draft.printedTotalPaise !== undefined && !check.matches;
@@ -262,6 +283,14 @@ export function ReviewStep({ draft, update, image, categorizing, canRescan, onRo
               <Icon name="plus" size={16} /> Discount
             </button>
           </div>
+          <div className="row-wrap gst-quick" role="group" aria-label="Set GST">
+            <span className="small muted">{hasTax ? 'Replace tax with GST:' : 'Bill had GST? Add CGST + SGST:'}</span>
+            {GST_RATES.slice(0, 3).map((r) => (
+              <button key={r} type="button" className="chip-btn" onClick={() => setGst(r)} disabled={gstBase <= 0} title={`CGST ${r / 2}% + SGST ${r / 2}% on ${formatINR(gstBase)}`}>
+                {r}%
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="card stack totals-card">
@@ -301,6 +330,11 @@ export function ReviewStep({ draft, update, image, categorizing, canRescan, onRo
               </strong>{' '}
               The items and charges come to {formatINR(check.computedPaise)} but the receipt says {formatINR(draft.printedTotalPaise!)}. Check the highlighted fields, or:
               <div className="row-wrap banner-actions">
+                {suggestedRate !== undefined && (
+                  <button type="button" className="btn btn-sm btn-primary" onClick={() => setGst(suggestedRate)}>
+                    Looks like {suggestedRate}% GST — add CGST + SGST
+                  </button>
+                )}
                 <button type="button" className="btn btn-sm" onClick={addDifference}>
                   Add {formatINR(check.differencePaise, { sign: true })} as a line
                 </button>

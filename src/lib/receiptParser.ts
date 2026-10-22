@@ -204,8 +204,20 @@ function detectDate(text: string): string | undefined {
 
 type Kind = 'noise' | 'subtotal' | 'total' | 'taxSummary' | AdjustmentKind | 'item' | 'header';
 
+/**
+ * Undo common OCR letter/digit swaps inside words so keywords still match:
+ * "6ST" → "gst", "C6ST" → "cgst", "SG5T" → "sgst", "T0TAL" → "total".
+ */
+export function normaliseLabel(label: string): string {
+  return label
+    .toLowerCase()
+    .split(/\s+/)
+    .map((w) => (/[a-z]/.test(w) && /[0-9]/.test(w) && !/^\d+[.,]?\d*%?$/.test(w) ? w.replace(/6/g, 'g').replace(/5/g, 's').replace(/0/g, 'o').replace(/1/g, 'l') : w))
+    .join(' ');
+}
+
 function classify(label: string): { kind: Kind; strength?: number } {
-  const l = label.toLowerCase();
+  const l = normaliseLabel(label);
   if (HEADER.test(l.replace(/\s+/g, ' ').trim()) && /[a-z]/.test(l)) return { kind: 'header' };
   if (SUBTOTAL.test(l)) return { kind: 'subtotal' };
   if (/tot(al)?\s*(gst|tax|taxes)\b/i.test(l)) return { kind: 'taxSummary' };
@@ -324,6 +336,7 @@ export function parseReceipt(lines: readonly OcrLine[]): ParsedReceipt {
    *        1   450.00   450.00
    */
   let pendingName: { tokens: Token[]; index: number; text: string } | null = null;
+  const rateOnlyTaxes: { label: string; rate: number; index: number; raw: string }[] = [];
 
   lines.forEach((line, index) => {
     const text = line.text.trim();
@@ -339,6 +352,15 @@ export function parseReceipt(lines: readonly OcrLine[]): ParsedReceipt {
     if (pending) result.ignored.push(pending.text);
 
     if (amounts.length === 0) {
+      // "SGST @ 2.50%" whose amount was not read: remember the rate, compute it later.
+      if (percentTokens.length > 0 && classify(label).kind === 'tax') {
+        const rate = parseFloat(percentTokens[percentTokens.length - 1].text.replace(/[^\d.,]/g, '').replace(',', '.'));
+        if (rate > 0 && rate <= 28) {
+          rateOnlyTaxes.push({ label: cleanName([...labelTokens, ...percentTokens]), rate, index, raw: text });
+          if (summaryStarted < 0) summaryStarted = index;
+          return;
+        }
+      }
       const isHeader = HEADER.test(label) && letters > 0;
       if (isHeader) bodyStarted = true;
       const plausible = letters >= 3 && !NOISE.test(label) && !isHeader && classify(label).kind === 'item';
@@ -423,6 +445,15 @@ export function parseReceipt(lines: readonly OcrLine[]): ParsedReceipt {
     if (kind === 'discount') amount = -Math.abs(amount);
     adjustments.push({ label: labelText, kind, amountPaise: amount, confidence: amountConf, raw: text, index });
   });
+
+  // Tax lines whose rate was read but whose amount wasn't: compute them on the subtotal
+  // (or the items) and flag them as low confidence so the user checks them.
+  if (rateOnlyTaxes.length > 0 && taxSummaries.length === 0 && !adjustments.some((a) => a.kind === 'tax')) {
+    const base = subtotals.length ? subtotals[subtotals.length - 1].amount : items.reduce((s, i) => s + i.totalPaise, 0);
+    for (const t of rateOnlyTaxes) {
+      adjustments.push({ label: `${t.label} (calculated)`, kind: 'tax', amountPaise: Math.round((base * t.rate) / 100), confidence: 0, raw: t.raw, index: t.index });
+    }
+  }
 
   // A "Total GST" line only counts when the individual CGST/SGST lines were not printed.
   if (!adjustments.some((a) => a.kind === 'tax')) adjustments.push(...taxSummaries);

@@ -145,4 +145,26 @@ describe('parseReceipt', () => {
       ['CHILLI PANEER', 35000],
     ]);
   });
+
+  it('recognises GST keywords despite OCR digit swaps', () => {
+    const r = parse(`Dosa 100.00\nC6ST 2.50\nSG5T 2.50\nGrand T0TAL 105.00`);
+    expect(r.adjustments.map((a) => [a.kind, a.amountPaise])).toEqual([
+      ['tax', 250],
+      ['tax', 250],
+    ]);
+    expect(r.totalPaise).toBe(10500);
+  });
+
+  it('computes tax lines whose rate was read but amount was not', () => {
+    const r = parse(`Fish Curry 2070.00\nWater 300.00\nAMOUNT : 2370.00\nSGST @ 2.50%\nCGST @ 2.50%`);
+    expect(r.adjustments.map((a) => [a.kind, a.amountPaise, a.confidence])).toEqual([
+      ['tax', 5925, 0],
+      ['tax', 5925, 0],
+    ]);
+  });
+
+  it('uses "Total GST" when the CGST/SGST lines were unreadable', () => {
+    const r = parse(`Fish Curry 2370.00\nxx ## 1\nTOTAL GST 118.50\nGRAND TOTAL 2489.00`);
+    expect(r.adjustments.map((a) => a.amountPaise)).toEqual([11850]);
+  });
 });
