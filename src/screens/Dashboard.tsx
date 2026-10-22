@@ -5,15 +5,15 @@ import { Icon } from '../components/Icon';
 import { Modal } from '../components/Modal';
 import { toast } from '../components/Toast';
 import { Avatar } from '../components/Avatar';
+import { EmojiPicker } from '../components/EmojiPicker';
 import { navigate } from '../hooks/useHashRoute';
 import { demoGroup } from '../lib/demo';
+import { GROUP_EMOJI_SETS, suggestGroupEmojis } from '../lib/emojis';
 import { formatINR } from '../lib/money';
 import { computeNetBalances, groupSpend } from '../lib/settle';
 import { groupFromJson } from '../lib/share';
 import type { Group } from '../lib/types';
 import { useStore } from '../store/useStore';
-
-const GROUP_EMOJIS = ['🌙', '🏖️', '🍕', '🏠', '🚌', '🎉', '🛒', '📶', '☕', '🎬'];
 
 function groupSummary(g: Group) {
   const nets = Object.values(computeNetBalances(g));
@@ -197,7 +197,10 @@ function CreateGroupModal({ open, onClose }: { open: boolean; onClose: () => voi
   const createGroup = useStore((s) => s.createGroup);
   const rememberedName = useStore((s) => s.settings.myName ?? '');
   const [name, setName] = useState('');
-  const [emoji, setEmoji] = useState(GROUP_EMOJIS[0]);
+  const [emoji, setEmoji] = useState('');
+  // Until the user picks one, the icon follows the name ("Goa trip" → 🏖️).
+  const suggested = suggestGroupEmojis(name);
+  const icon = emoji || suggested[0] || '👥';
   const [myName, setMyName] = useState(rememberedName);
   const [members, setMembers] = useState<string[]>([]);
   const [draft, setDraft] = useState('');
@@ -222,8 +225,9 @@ function CreateGroupModal({ open, onClose }: { open: boolean; onClose: () => voi
         .map((n) => n.trim())
         .filter(Boolean),
     ];
-    const id = createGroup(name, all, emoji, myName);
+    const id = createGroup(name, all, icon, myName);
     setName('');
+    setEmoji('');
     setMembers([]);
     setDraft('');
     onClose();
@@ -268,13 +272,7 @@ function CreateGroupModal({ open, onClose }: { open: boolean; onClose: () => voi
         </label>
         <fieldset className="field">
           <legend>Icon</legend>
-          <div className="emoji-picker" role="radiogroup" aria-label="Group icon">
-            {GROUP_EMOJIS.map((e) => (
-              <button type="button" key={e} role="radio" aria-checked={emoji === e} className={emoji === e ? 'selected' : ''} onClick={() => setEmoji(e)}>
-                {e}
-              </button>
-            ))}
-          </div>
+          <EmojiPicker sets={GROUP_EMOJI_SETS} value={emoji || suggested[0] || ''} onChange={setEmoji} label="Group icon" suggested={suggested} />
         </fieldset>
         <label className="field">
           <span>Your name</span>

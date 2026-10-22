@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { describeDefault, initialSplit } from '../src/lib/defaultSplit';
+import { myStake, paidByShort } from '../src/lib/payers';
 import { matchesQuery } from '../src/lib/search';
 import { computeNetBalances, rawDebts, suggestSettlements } from '../src/lib/settle';
 import type { Expense, Group } from '../src/lib/types';
@@ -219,5 +220,22 @@ describe('several people paying one bill', () => {
       const nets = computeNetBalances(g);
       expect(b).toEqual({ r: -nets.r, a: -nets.a, m: -nets.m });
     }
+  });
+});
+
+describe('expense row: what it means for you', () => {
+  it('says lent, borrowed, even or not involved', () => {
+    expect(myStake(base, base.expenses[2])).toEqual({ kind: 'lent', amount: 24000 }); // you paid for Arjun's tikka
+    expect(myStake(base, base.expenses[0])).toEqual({ kind: 'borrowed', amount: 10000 });
+    expect(myStake(base, manual('x', 'Arjun & Meera', 'a', 20000, ['a', 'm']))).toEqual({ kind: 'none', amount: 0 });
+    expect(myStake(base, manual('y', 'Own coffee', 'r', 5000, ['r']))).toEqual({ kind: 'even', amount: 0 });
+    expect(myStake({ ...base, meId: undefined }, base.expenses[0])).toBeNull();
+  });
+
+  it('several payers count toward what you lent', () => {
+    const e = { ...manual('z', 'Trek', 'r', 30000), payers: { r: 20000, a: 10000 } };
+    expect(myStake(base, e)).toEqual({ kind: 'lent', amount: 10000 });
+    expect(paidByShort(base, e)).toBe('You and Arjun paid');
+    expect(paidByShort(base, { ...e, payers: { r: 10000, a: 10000, m: 10000 } })).toBe('3 people paid');
   });
 });

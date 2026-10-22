@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Avatar } from '../../components/Avatar';
+import { EmojiPicker } from '../../components/EmojiPicker';
 import { Icon } from '../../components/Icon';
 import { Modal } from '../../components/Modal';
 import { toast } from '../../components/Toast';
 import { Banner } from '../../components/ui';
 import { navigate } from '../../hooks/useHashRoute';
+import { AVATAR_EMOJI_SETS, GROUP_EMOJI_SETS, suggestGroupEmojis } from '../../lib/emojis';
 import { AVATAR_COLORS } from '../../lib/ids';
 import { formatINR } from '../../lib/money';
 import type { Group, Member } from '../../lib/types';
@@ -15,8 +17,6 @@ import { SplitEditor } from '../../components/SplitEditor';
 import { memberInUse, useStore } from '../../store/useStore';
 import { ExportActions } from './ExportActions';
 
-const MEMBER_EMOJIS = ['', '😎', '🦁', '🐼', '🦊', '🐯', '🐸', '🐵', '🦄', '🐙', '🌟', '⚡'];
-
 export function SettingsTab({ group }: { group: Group }) {
   const { renameGroup, deleteGroup, addMember, removeMember, saveRecurring, deleteRecurring, settings, updateSettings, setMe, setSimplifyDebts } = useStore();
   const [editingDefault, setEditingDefault] = useState(false);
@@ -26,6 +26,7 @@ export function SettingsTab({ group }: { group: Group }) {
   const [newName, setNewName] = useState('');
   const [editing, setEditing] = useState<Member | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [pickingIcon, setPickingIcon] = useState(false);
 
   return (
     <div className="stack-lg">
@@ -43,6 +44,9 @@ export function SettingsTab({ group }: { group: Group }) {
             }
           }}
         >
+          <button type="button" className="icon-pick-btn" onClick={() => setPickingIcon(true)} aria-label="Change group icon" title="Change group icon">
+            {group.emoji || '👥'}
+          </button>
           <label className="sr-only" htmlFor="group-name">
             Group name
           </label>
@@ -51,6 +55,18 @@ export function SettingsTab({ group }: { group: Group }) {
             Rename
           </button>
         </form>
+        <Modal open={pickingIcon} title="Group icon" onClose={() => setPickingIcon(false)}>
+          <EmojiPicker
+            sets={GROUP_EMOJI_SETS}
+            value={group.emoji ?? ''}
+            suggested={suggestGroupEmojis(group.name)}
+            label="Group icon"
+            onChange={(e) => {
+              renameGroup(group.id, group.name, e);
+              setPickingIcon(false);
+            }}
+          />
+        </Modal>
       </section>
 
       <section className="card stack" aria-labelledby="members-h">
@@ -323,20 +339,13 @@ function MemberModal({ group, member, onClose }: { group: Group; member: Member 
           </fieldset>
           <fieldset className="field">
             <legend>Avatar</legend>
-            <div className="emoji-picker" role="radiogroup" aria-label="Avatar emoji">
-              {MEMBER_EMOJIS.map((e) => (
-                <button
-                  key={e || 'none'}
-                  type="button"
-                  role="radio"
-                  aria-checked={(draft.emoji ?? '') === e}
-                  className={(draft.emoji ?? '') === e ? 'selected' : ''}
-                  onClick={() => setDraft({ ...draft, emoji: e })}
-                >
-                  {e || 'Aa'}
-                </button>
-              ))}
-            </div>
+            <EmojiPicker
+              sets={AVATAR_EMOJI_SETS}
+              value={draft.emoji ?? ''}
+              onChange={(e) => setDraft({ ...draft, emoji: e })}
+              label="Avatar emoji"
+              noneLabel="Aa"
+            />
           </fieldset>
           <label className="field">
             <span>UPI ID (optional)</span>

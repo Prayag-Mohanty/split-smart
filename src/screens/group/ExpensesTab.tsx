@@ -1,9 +1,8 @@
-import { useMemo, useState } from 'react';
-import { Avatar } from '../../components/Avatar';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { Icon } from '../../components/Icon';
 import { CATEGORY_META, EmptyState } from '../../components/ui';
 import { formatINR } from '../../lib/money';
-import { paidByPhrase } from '../../lib/payers';
+import { myStake, paidByShort } from '../../lib/payers';
 import { matchesQuery } from '../../lib/search';
 import { suggestSettlements } from '../../lib/settle';
 import { expenseShares, expenseTotal } from '../../lib/split';
@@ -14,7 +13,6 @@ export function ExpensesTab({ group }: { group: Group }) {
   const [query, setQuery] = useState('');
   const [showSettled, setShowSettled] = useState(false);
   const order = useMemo(() => group.members.map((m) => m.id), [group.members]);
-  const byId = useMemo(() => new Map(group.members.map((m) => [m.id, m])), [group.members]);
 
   if (group.members.length === 0) {
     return (
@@ -49,12 +47,12 @@ export function ExpensesTab({ group }: { group: Group }) {
     );
   }
 
-  // Group the list under date headings.
+  // Group the list under month headings; each row shows its own day.
   const sections: { date: string; list: typeof items }[] = [];
   for (const e of items) {
     const last = sections[sections.length - 1];
-    if (last && last.date === e.date) last.list.push(e);
-    else sections.push({ date: e.date, list: [e] });
+    if (last && last.date === e.date.slice(0, 7)) last.list.push(e);
+    else sections.push({ date: e.date.slice(0, 7), list: [e] });
   }
 
   // Once everyone is settled up, fold the old expenses away so the list starts clean.
@@ -133,38 +131,49 @@ export function ExpensesTab({ group }: { group: Group }) {
           )}
           {sections.map((s) => (
             <section key={s.date} className="expense-section">
-              <h3 className="date-heading">
-                {new Date(s.date).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
-              </h3>
-              <ul className="card list">
+              <h3 className="month-heading">{localDate(`${s.date}-01`).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</h3>
+              <ul className="card list expense-list">
                 {s.list.map((e) => {
-                  const payer = byId.get(e.payerId);
                   const total = expenseTotal(e);
-                  const shares = expenseShares(e, order);
-                  const n = Object.keys(shares).length;
+                  const n = Object.keys(expenseShares(e, order)).length;
+                  const stake = myStake(group, e);
+                  const day = localDate(e.date);
+                  const meta = CATEGORY_META[e.category];
                   const href = e.kind === 'itemized' ? `#/g/${group.id}/scan/${e.id}` : `#/g/${group.id}/expense/${e.id}`;
                   return (
                     <li key={e.id}>
-                      <a className="list-row" href={href}>
-                        <span className="cat-dot" style={{ background: CATEGORY_META[e.category].color }} aria-hidden="true">
-                          {CATEGORY_META[e.category].emoji}
+                      <a className="list-row expense-row" href={href}>
+                        <span className="date-col" aria-label={day.toLocaleDateString('en-IN', { day: 'numeric', month: 'long' })}>
+                          <span aria-hidden="true">{day.toLocaleDateString('en-IN', { month: 'short' })}</span>
+                          <strong aria-hidden="true">{String(day.getDate()).padStart(2, '0')}</strong>
+                        </span>
+                        <span className="cat-tile" style={{ '--cat': meta.color } as CSSProperties} title={e.category} aria-hidden="true">
+                          {meta.emoji}
                         </span>
                         <span className="grow min0">
                           <span className="row-title">
-                            {e.description}
+                            <span className="truncate">{e.description}</span>
                             {e.kind === 'itemized' && (
-                              <span className="pill pill-neutral" title="Itemized receipt">
-                                <Icon name="receipt" size={12} /> Itemised · {e.items.length}
-                              </span>
+                              <Icon name="receipt" size={14} className="muted inline-icon" title={`Itemised receipt · ${e.items.length} items`} />
                             )}
                             {e.recurringId && <Icon name="repeat" size={14} className="muted inline-icon" title="Recurring" />}
                           </span>
                           <span className="row-sub">
-                            {payer && <Avatar member={payer} size="sm" />} {paidByPhrase(group, e)} · split {n} way{n === 1 ? '' : 's'}
+                            {stake?.kind === 'none' ? 'You are not involved' : `${paidByShort(group, e)} ${formatINR(total)}`}
+                            {!stake && ` · split ${n} way${n === 1 ? '' : 's'}`}
                             {n === 0 && <span className="error-text"> (needs fixing)</span>}
                           </span>
                         </span>
-                        <span className="row-amount">{formatINR(total)}</span>
+                        {stake ? (
+                          stake.kind !== 'none' && (
+                            <span className={`stake stake-${stake.kind}`}>
+                              <span>{stake.kind === 'lent' ? 'you lent' : stake.kind === 'borrowed' ? 'you borrowed' : 'no balance'}</span>
+                              {stake.amount > 0 && <strong>{formatINR(stake.amount)}</strong>}
+                            </span>
+                          )
+                        ) : (
+                          <span className="row-amount">{formatINR(total)}</span>
+                        )}
                       </a>
                     </li>
                   );
@@ -176,4 +185,10 @@ export function ExpensesTab({ group }: { group: Group }) {
       )}
     </>
   );
+}
+
+/** A YYYY-MM-DD date at local midnight (new Date('YYYY-MM-DD') is UTC and can land on the previous day). */
+function localDate(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d);
 }
