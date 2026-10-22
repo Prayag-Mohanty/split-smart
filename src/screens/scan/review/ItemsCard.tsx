@@ -97,9 +97,19 @@ export function ItemsCard({ draft, update, activeLine, setActiveLine, categorizi
               <span className="item-cat-emoji" aria-hidden="true">
                 {CATEGORY_META[it.category].emoji}
               </span>
-              <CategorySelect compact label={`Item ${idx + 1} category`} value={it.category} onChange={(c) => setItem(it.id, { category: c, categoryLocked: true })} />
+              <CategorySelect
+                compact
+                label={`Item ${idx + 1} category`}
+                value={it.category}
+                onChange={(c) => setItem(it.id, { category: c, categoryLocked: true })}
+              />
             </span>
-            <button type="button" className="icon-btn" aria-label={`Delete ${it.name || `item ${idx + 1}`}`} onClick={() => update((d) => ({ ...d, items: d.items.filter((x) => x.id !== it.id) }))}>
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label={`Delete ${it.name || `item ${idx + 1}`}`}
+              onClick={() => update((d) => ({ ...d, items: d.items.filter((x) => x.id !== it.id) }))}
+            >
               <Icon name="trash" size={18} />
             </button>
           </li>

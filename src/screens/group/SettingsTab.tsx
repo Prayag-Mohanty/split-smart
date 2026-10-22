@@ -107,7 +107,14 @@ export function SettingsTab({ group }: { group: Group }) {
           <label className="sr-only" htmlFor="new-member">
             New member name
           </label>
-          <input id="new-member" className="input grow" placeholder="Add a member" value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={40} />
+          <input
+            id="new-member"
+            className="input grow"
+            placeholder="Add a member"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            maxLength={40}
+          />
           <button type="submit" className="btn btn-primary" disabled={!newName.trim()}>
             <Icon name="plus" size={18} /> Add
           </button>
@@ -120,9 +127,7 @@ export function SettingsTab({ group }: { group: Group }) {
           Recurring expenses
         </h2>
         {group.recurring.length === 0 ? (
-          <p className="muted small">
-            Monthly bills like a Wi-Fi recharge can be added automatically. Turn on “Repeat” when adding an expense.
-          </p>
+          <p className="muted small">Monthly bills like a Wi-Fi recharge can be added automatically. Turn on “Repeat” when adding an expense.</p>
         ) : (
           <ul className="list">
             {group.recurring.map((r) => (
@@ -135,7 +140,12 @@ export function SettingsTab({ group }: { group: Group }) {
                   </span>
                 </span>
                 <label className="switch" title={r.active ? 'Pause' : 'Resume'}>
-                  <input type="checkbox" checked={r.active} onChange={(e) => saveRecurring(group.id, { ...r, active: e.target.checked })} aria-label={`${r.description} active`} />
+                  <input
+                    type="checkbox"
+                    checked={r.active}
+                    onChange={(e) => saveRecurring(group.id, { ...r, active: e.target.checked })}
+                    aria-label={`${r.description} active`}
+                  />
                   <span />
                 </label>
                 <button type="button" className="icon-btn" aria-label={`Delete recurring ${r.description}`} onClick={() => deleteRecurring(group.id, r.id)}>
@@ -161,9 +171,14 @@ export function SettingsTab({ group }: { group: Group }) {
             <details className="small learn-more">
               <summary>Learn more</summary>
               <p>
-                With simplification on, SplitSmart looks only at what each person is owed or owes overall and finds the fewest payments that settle everyone — e.g. if Arjun owes Riya ₹200 and Meera owes Arjun ₹200, Meera just pays Riya ₹200. Nobody pays or receives a rupee more than their balance; only who-pays-whom changes.
+                With simplification on, SplitSmart looks only at what each person is owed or owes overall and finds the fewest payments that settle everyone —
+                e.g. if Arjun owes Riya ₹200 and Meera owes Arjun ₹200, Meera just pays Riya ₹200. Nobody pays or receives a rupee more than their balance; only
+                who-pays-whom changes.
               </p>
-              <p>Turn it off if your group prefers to repay each debt to the person who actually paid, even if that takes more payments. This setting applies to the whole group.</p>
+              <p>
+                Turn it off if your group prefers to repay each debt to the person who actually paid, even if that takes more payments. This setting applies to
+                the whole group.
+              </p>
             </details>
           </div>
           <span className="switch">
@@ -266,7 +281,12 @@ function MemberModal({ group, member, onClose }: { group: Group; member: Member 
             disabled={!draft?.name.trim() || !vpaOk}
             onClick={() => {
               if (!draft) return;
-              updateMember(group.id, draft.id, { name: draft.name.trim(), color: draft.color, emoji: draft.emoji || undefined, upiId: draft.upiId?.trim() || undefined });
+              updateMember(group.id, draft.id, {
+                name: draft.name.trim(),
+                color: draft.color,
+                emoji: draft.emoji || undefined,
+                upiId: draft.upiId?.trim() || undefined,
+              });
               onClose();
             }}
           >
@@ -288,7 +308,16 @@ function MemberModal({ group, member, onClose }: { group: Group; member: Member 
             <legend>Colour</legend>
             <div className="swatches" role="radiogroup" aria-label="Avatar colour">
               {AVATAR_COLORS.map((c) => (
-                <button key={c} type="button" role="radio" aria-checked={draft.color === c} aria-label={c} className={draft.color === c ? 'selected' : ''} style={{ background: c }} onClick={() => setDraft({ ...draft, color: c })} />
+                <button
+                  key={c}
+                  type="button"
+                  role="radio"
+                  aria-checked={draft.color === c}
+                  aria-label={c}
+                  className={draft.color === c ? 'selected' : ''}
+                  style={{ background: c }}
+                  onClick={() => setDraft({ ...draft, color: c })}
+                />
               ))}
             </div>
           </fieldset>
@@ -296,7 +325,14 @@ function MemberModal({ group, member, onClose }: { group: Group; member: Member 
             <legend>Avatar</legend>
             <div className="emoji-picker" role="radiogroup" aria-label="Avatar emoji">
               {MEMBER_EMOJIS.map((e) => (
-                <button key={e || 'none'} type="button" role="radio" aria-checked={(draft.emoji ?? '') === e} className={(draft.emoji ?? '') === e ? 'selected' : ''} onClick={() => setDraft({ ...draft, emoji: e })}>
+                <button
+                  key={e || 'none'}
+                  type="button"
+                  role="radio"
+                  aria-checked={(draft.emoji ?? '') === e}
+                  className={(draft.emoji ?? '') === e ? 'selected' : ''}
+                  onClick={() => setDraft({ ...draft, emoji: e })}
+                >
                   {e || 'Aa'}
                 </button>
               ))}
@@ -304,7 +340,14 @@ function MemberModal({ group, member, onClose }: { group: Group; member: Member 
           </fieldset>
           <label className="field">
             <span>UPI ID (optional)</span>
-            <input className="input" value={draft.upiId ?? ''} onChange={(e) => setDraft({ ...draft, upiId: e.target.value })} placeholder="name@okaxis" autoCapitalize="none" autoCorrect="off" />
+            <input
+              className="input"
+              value={draft.upiId ?? ''}
+              onChange={(e) => setDraft({ ...draft, upiId: e.target.value })}
+              placeholder="name@okaxis"
+              autoCapitalize="none"
+              autoCorrect="off"
+            />
             {!vpaOk && <small className="error-text">Enter a UPI ID like name@bank.</small>}
           </label>
         </div>
@@ -320,7 +363,8 @@ function DefaultSplitModal({ group, onClose }: { group: Group; onClose: () => vo
   const start = initialSplit(group, saved);
   const [payerId, setPayerId] = useState(start.payerId);
   const [split, setSplit] = useState<SplitSpec>(start.split);
-  const valid = split.participants.length > 0 && (split.mode !== 'percent' || Math.abs(split.participants.reduce((s, id) => s + (split.values[id] ?? 0), 0) - 100) < 1e-6);
+  const valid =
+    split.participants.length > 0 && (split.mode !== 'percent' || Math.abs(split.participants.reduce((s, id) => s + (split.values[id] ?? 0), 0) - 100) < 1e-6);
 
   return (
     <Modal
@@ -365,7 +409,14 @@ function DefaultSplitModal({ group, onClose }: { group: Group; onClose: () => vo
           <legend>Paid by</legend>
           <div className="payer-picker" role="radiogroup" aria-label="Default payer">
             {group.members.map((m) => (
-              <button key={m.id} type="button" role="radio" aria-checked={payerId === m.id} className={`payer${payerId === m.id ? ' selected' : ''}`} onClick={() => setPayerId(m.id)}>
+              <button
+                key={m.id}
+                type="button"
+                role="radio"
+                aria-checked={payerId === m.id}
+                className={`payer${payerId === m.id ? ' selected' : ''}`}
+                onClick={() => setPayerId(m.id)}
+              >
                 <Avatar member={m} size="sm" />
                 {m.id === group.meId ? `${m.name} (you)` : m.name}
               </button>
@@ -381,4 +432,3 @@ function DefaultSplitModal({ group, onClose }: { group: Group; onClose: () => vo
     </Modal>
   );
 }
-

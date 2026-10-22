@@ -146,7 +146,13 @@ import { formatINR } from '../src/lib/money';
 import { balancePhrase, personName } from '../src/lib/people';
 
 describe('second-person copy', () => {
-  const g = { meId: 'a', members: [{ id: 'a', name: 'Riya', color: '#000' }, { id: 'b', name: 'Arjun', color: '#000' }] };
+  const g = {
+    meId: 'a',
+    members: [
+      { id: 'a', name: 'Riya', color: '#000' },
+      { id: 'b', name: 'Arjun', color: '#000' },
+    ],
+  };
   it('calls the current user "You"', () => {
     expect(personName(g, 'a')).toBe('You');
     expect(personName(g, 'a', { lower: true })).toBe('you');

@@ -166,7 +166,13 @@ export function draftToExpense(d: Draft, createdAt = Date.now()): ItemizedExpens
     items: d.items.map(({ low: _l, line: _ln, ...rest }) => (void _l, void _ln, { ...rest, name: rest.name.trim() || 'Item' })),
     adjustments: d.adjustments
       .filter((a) => a.amountPaise !== 0)
-      .map(({ low: _l, line: _ln, ...rest }) => (void _l, void _ln, { ...rest, amountPaise: rest.kind === 'discount' ? -Math.abs(rest.amountPaise) : rest.amountPaise })),
+      .map(
+        ({ low: _l, line: _ln, ...rest }) => (
+          void _l,
+          void _ln,
+          { ...rest, amountPaise: rest.kind === 'discount' ? -Math.abs(rest.amountPaise) : rest.amountPaise }
+        ),
+      ),
     printedTotalPaise: d.printedTotalPaise,
   };
 }

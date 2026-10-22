@@ -49,7 +49,8 @@ export function TotalsCard({ draft, update, check, noItems, mismatch, needsConfi
       </div>
       {!noItems && draft.printedTotalPaise !== undefined && check.matches && (
         <Banner tone="ok">
-          Items {check.adjustmentsPaise ? '+ tax & charges ' : ''}match the {draft.totalSource === 'printed' ? 'printed' : 'confirmed'} total of {formatINR(draft.printedTotalPaise)}.
+          Items {check.adjustmentsPaise ? '+ tax & charges ' : ''}match the {draft.totalSource === 'printed' ? 'printed' : 'confirmed'} total of{' '}
+          {formatINR(draft.printedTotalPaise)}.
         </Banner>
       )}
       {mismatch && (
@@ -57,7 +58,8 @@ export function TotalsCard({ draft, update, check, noItems, mismatch, needsConfi
           <strong>
             Doesn't add up: {formatINR(Math.abs(check.differencePaise))} {check.differencePaise > 0 ? 'missing' : 'extra'}.
           </strong>{' '}
-          The items and charges come to {formatINR(check.computedPaise)} but the receipt says {formatINR(draft.printedTotalPaise!)}. Check the highlighted fields, or:
+          The items and charges come to {formatINR(check.computedPaise)} but the receipt says {formatINR(draft.printedTotalPaise!)}. Check the highlighted
+          fields, or:
           <div className="row-wrap banner-actions">
             {suggestedRate !== undefined && (
               <button type="button" className="btn btn-sm btn-primary" onClick={() => setGst(suggestedRate)}>
@@ -75,7 +77,8 @@ export function TotalsCard({ draft, update, check, noItems, mismatch, needsConfi
       )}
       {needsConfirm && (
         <Banner tone="info">
-          No total was found on the receipt. We calculated <strong>{formatINR(check.computedPaise)}</strong> from the items — please confirm it matches the bill.
+          No total was found on the receipt. We calculated <strong>{formatINR(check.computedPaise)}</strong> from the items — please confirm it matches the
+          bill.
           <div className="row-wrap banner-actions">
             <button type="button" className="btn btn-sm btn-primary" onClick={confirmComputed}>
               <Icon name="check" size={16} /> Confirm {formatINR(check.computedPaise)}

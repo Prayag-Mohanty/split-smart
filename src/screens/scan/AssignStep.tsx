@@ -40,15 +40,25 @@ export function AssignStep({ group, draft, update, onBack, onNext }: AssignStepP
     update((d) => ({
       ...d,
       items: d.items.map((it) =>
-        it.id !== itemId ? it : { ...it, assignees: it.assignees.includes(memberId) ? it.assignees.filter((a) => a !== memberId) : order.filter((m) => m === memberId || it.assignees.includes(m)) },
+        it.id !== itemId
+          ? it
+          : {
+              ...it,
+              assignees: it.assignees.includes(memberId)
+                ? it.assignees.filter((a) => a !== memberId)
+                : order.filter((m) => m === memberId || it.assignees.includes(m)),
+            },
       ),
     }));
   const addAssignee = (itemId: string, memberId: string) =>
     update((d) => ({
       ...d,
-      items: d.items.map((it) => (it.id !== itemId || it.assignees.includes(memberId) ? it : { ...it, assignees: order.filter((m) => m === memberId || it.assignees.includes(m)) })),
+      items: d.items.map((it) =>
+        it.id !== itemId || it.assignees.includes(memberId) ? it : { ...it, assignees: order.filter((m) => m === memberId || it.assignees.includes(m)) },
+      ),
     }));
-  const setAll = (itemId: string, all: boolean) => update((d) => ({ ...d, items: d.items.map((it) => (it.id === itemId ? { ...it, assignees: all ? [...order] : [] } : it)) }));
+  const setAll = (itemId: string, all: boolean) =>
+    update((d) => ({ ...d, items: d.items.map((it) => (it.id === itemId ? { ...it, assignees: all ? [...order] : [] } : it)) }));
   const assignRemaining = () => update((d) => ({ ...d, items: d.items.map((it) => (it.assignees.length ? it : { ...it, assignees: [...order] })) }));
 
   // --- Drag an item onto a face (pointer events: works for touch, pen and mouse) ---
@@ -86,7 +96,14 @@ export function AssignStep({ group, draft, update, onBack, onNext }: AssignStepP
         <h2 className="card-title">Who paid the bill?</h2>
         <div className="payer-picker" role="radiogroup" aria-label="Paid by">
           {group.members.map((m) => (
-            <button key={m.id} type="button" role="radio" aria-checked={draft.payerId === m.id} className={`payer${draft.payerId === m.id ? ' selected' : ''}`} onClick={() => update((d) => ({ ...d, payerId: m.id }))}>
+            <button
+              key={m.id}
+              type="button"
+              role="radio"
+              aria-checked={draft.payerId === m.id}
+              className={`payer${draft.payerId === m.id ? ' selected' : ''}`}
+              onClick={() => update((d) => ({ ...d, payerId: m.id }))}
+            >
               <Avatar member={m} size="sm" />
               {m.id === group.meId ? `${m.name} (you)` : m.name}
             </button>
@@ -103,7 +120,8 @@ export function AssignStep({ group, draft, update, onBack, onNext }: AssignStepP
         )}
       </div>
       <p className="small muted">
-        Tap faces to assign each item. Shared items are split equally between the people you pick. <span className="desktop-hint">Or drag an item by its handle onto a face below.</span>
+        Tap faces to assign each item. Shared items are split equally between the people you pick.{' '}
+        <span className="desktop-hint">Or drag an item by its handle onto a face below.</span>
       </p>
 
       {split.unassigned.length > 0 && (
@@ -155,7 +173,14 @@ export function AssignStep({ group, draft, update, onBack, onNext }: AssignStepP
                 {group.members.map((m) => {
                   const on = it.assignees.includes(m.id);
                   return (
-                    <button key={m.id} type="button" className={`avatar-toggle${on ? ' on' : ''}`} aria-pressed={on} aria-label={`${m.name} had ${it.name}`} onClick={() => toggle(it.id, m.id)}>
+                    <button
+                      key={m.id}
+                      type="button"
+                      className={`avatar-toggle${on ? ' on' : ''}`}
+                      aria-pressed={on}
+                      aria-label={`${m.name} had ${it.name}`}
+                      onClick={() => toggle(it.id, m.id)}
+                    >
                       <Avatar member={m} dim={!on} />
                       <span className="avatar-toggle-name">{m.id === group.meId ? 'You' : m.name}</span>
                       {on && <Icon name="check" size={12} className="avatar-check" />}

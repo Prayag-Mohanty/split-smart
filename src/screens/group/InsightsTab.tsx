@@ -121,7 +121,14 @@ export function InsightsTab({ group }: { group: Group }) {
         <h2 id="time-h" className="card-title">
           Over time
         </h2>
-        <div className="columns" role="img" aria-label={timeline.filter((t) => t.total).map((t) => `${t.label}: ${formatINR(t.total)}`).join(', ')}>
+        <div
+          className="columns"
+          role="img"
+          aria-label={timeline
+            .filter((t) => t.total)
+            .map((t) => `${t.label}: ${formatINR(t.total)}`)
+            .join(', ')}
+        >
           {timeline.map((t) => (
             <div key={t.key} className="column" title={`${t.label}: ${formatINR(t.total)}`}>
               <span className="column-fill" style={{ height: `${(t.total / timeMax) * 100}%` }} />

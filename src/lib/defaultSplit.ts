@@ -23,7 +23,7 @@ export function initialSplit(group: Group, saved?: DefaultSplit): { payerId: Mem
 /** Human summary, e.g. "Paid by you and split equally" / "Paid by Riya, split by shares (2 : 1 : 1)". */
 export function describeDefault(group: Group, saved?: DefaultSplit): string {
   const { payerId, split } = initialSplit(group, saved);
-  const payer = payerId === group.meId ? 'you' : group.members.find((m) => m.id === payerId)?.name ?? 'someone';
+  const payer = payerId === group.meId ? 'you' : (group.members.find((m) => m.id === payerId)?.name ?? 'someone');
   const everyone = split.participants.length === group.members.length;
   const who = everyone ? '' : ` between ${split.participants.length} of ${group.members.length} people`;
   const how =

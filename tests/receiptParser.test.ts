@@ -37,7 +37,11 @@ describe('parseReceipt', () => {
       ['tax', 2000],
     ]);
     expect(r.totalPaise).toBe(84000);
-    const check = checkTotals(r.items.map((i) => i.totalPaise), r.adjustments.map((a) => a.amountPaise), r.totalPaise);
+    const check = checkTotals(
+      r.items.map((i) => i.totalPaise),
+      r.adjustments.map((a) => a.amountPaise),
+      r.totalPaise,
+    );
     expect(check.matches).toBe(true);
   });
 
@@ -65,7 +69,11 @@ describe('parseReceipt', () => {
       ['other', -25],
     ]);
     expect(r.totalPaise).toBe(48000);
-    const check = checkTotals(r.items.map((i) => i.totalPaise), r.adjustments.map((a) => a.amountPaise), r.totalPaise);
+    const check = checkTotals(
+      r.items.map((i) => i.totalPaise),
+      r.adjustments.map((a) => a.amountPaise),
+      r.totalPaise,
+    );
     expect(check.differencePaise).toBe(48000 - (50500 + 2525 - 5000 - 25));
   });
 

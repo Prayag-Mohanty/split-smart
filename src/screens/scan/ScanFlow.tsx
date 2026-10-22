@@ -151,7 +151,13 @@ function Flow({ group, editing }: { group: Group; editing?: Extract<Group['expen
         // Read at the chosen rotation; if nothing sensible comes out and the user hasn't
         // rotated manually, try the two sideways orientations and keep the best read.
         const attempts: Rotation[] = autoOrient.current ? [rot, ((rot + 90) % 360) as Rotation, ((rot + 270) % 360) as Rotation] : [rot];
-        let best: { rot: Rotation; canvas: HTMLCanvasElement; result: Awaited<ReturnType<typeof recognizeReceipt>>; parsed: ReturnType<typeof parseReceipt>; score: number } | null = null;
+        let best: {
+          rot: Rotation;
+          canvas: HTMLCanvasElement;
+          result: Awaited<ReturnType<typeof recognizeReceipt>>;
+          parsed: ReturnType<typeof parseReceipt>;
+          score: number;
+        } | null = null;
         for (const [n, r] of attempts.entries()) {
           if (n > 0) setProgress({ stage: 'Trying another orientation', progress: 0.4 });
           const canvas = drawRotated(bitmap, r);
@@ -253,68 +259,70 @@ function Flow({ group, editing }: { group: Group; editing?: Extract<Group['expen
       </nav>
       <main id="main" className={`page with-fab ${step === 'review' ? 'wide' : ''}`}>
         <div key={step} className={`step-anim step-${direction}`}>
-        {step === 'capture' && (
-          <CaptureStep
-            preview={bitmap ? preview : ''}
-            error={error}
-            onFiles={addFiles}
-            onRotate={(delta) => {
-              autoOrient.current = false;
-              setRotation((r) => (((r + delta + 360) % 360) as Rotation));
-            }}
-            onProcess={() => process()}
-            onClear={() => {
-              setBitmap(null);
-              setPreview('');
-              setQueue([]);
-            }}
-            onManual={startManual}
-            queueLength={queue.length}
-          />
-        )}
-        {step === 'processing' && <ProcessingStep preview={preview} progress={progress} onCancel={cancelProcessing} />}
-        {step === 'review' && (
-          <ReviewStep
-            draft={draft}
-            update={updateDraft}
-            image={image}
-            categorizing={categorizing}
-            canRescan={!!bitmap}
-            onRotate={(delta) => {
-              autoOrient.current = false;
-              const r = (((rotation + delta + 360) % 360) as Rotation);
-              setRotation(r);
-              process(r);
-            }}
-            onRetake={() => {
-              setStep('capture');
-              setBitmap(null);
-              setPreview('');
-            }}
-            onManualFallback={startManual}
-            onNext={() => setStep('assign')}
-          />
-        )}
-        {step === 'assign' && <AssignStep group={group} draft={draft} update={updateDraft} onBack={() => setStep('review')} onNext={() => setStep('summary')} />}
-        {step === 'summary' && (
-          <SummaryStep
-            group={group}
-            draft={draft}
-            update={updateDraft}
-            onBack={() => setStep('assign')}
-            onSave={save}
-            onDelete={
-              editing
-                ? () => {
-                    deleteExpense(group.id, editing.id);
-                    dirty.current = false;
-                    toast('Receipt deleted', 'success', { label: 'Undo', onClick: () => saveExpense(group.id, editing) });
-                    navigate(`/g/${group.id}`, true);
-                  }
-                : undefined
-            }
-          />
-        )}
+          {step === 'capture' && (
+            <CaptureStep
+              preview={bitmap ? preview : ''}
+              error={error}
+              onFiles={addFiles}
+              onRotate={(delta) => {
+                autoOrient.current = false;
+                setRotation((r) => ((r + delta + 360) % 360) as Rotation);
+              }}
+              onProcess={() => process()}
+              onClear={() => {
+                setBitmap(null);
+                setPreview('');
+                setQueue([]);
+              }}
+              onManual={startManual}
+              queueLength={queue.length}
+            />
+          )}
+          {step === 'processing' && <ProcessingStep preview={preview} progress={progress} onCancel={cancelProcessing} />}
+          {step === 'review' && (
+            <ReviewStep
+              draft={draft}
+              update={updateDraft}
+              image={image}
+              categorizing={categorizing}
+              canRescan={!!bitmap}
+              onRotate={(delta) => {
+                autoOrient.current = false;
+                const r = ((rotation + delta + 360) % 360) as Rotation;
+                setRotation(r);
+                process(r);
+              }}
+              onRetake={() => {
+                setStep('capture');
+                setBitmap(null);
+                setPreview('');
+              }}
+              onManualFallback={startManual}
+              onNext={() => setStep('assign')}
+            />
+          )}
+          {step === 'assign' && (
+            <AssignStep group={group} draft={draft} update={updateDraft} onBack={() => setStep('review')} onNext={() => setStep('summary')} />
+          )}
+          {step === 'summary' && (
+            <SummaryStep
+              group={group}
+              draft={draft}
+              update={updateDraft}
+              onBack={() => setStep('assign')}
+              onSave={save}
+              onDelete={
+                editing
+                  ? () => {
+                      deleteExpense(group.id, editing.id);
+                      dirty.current = false;
+                      toast('Receipt deleted', 'success', { label: 'Undo', onClick: () => saveExpense(group.id, editing) });
+                      navigate(`/g/${group.id}`, true);
+                    }
+                  : undefined
+              }
+            />
+          )}
         </div>
       </main>
     </>

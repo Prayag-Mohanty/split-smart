@@ -60,9 +60,7 @@ function weightScale(weights: readonly number[]): number {
   return scale;
 }
 
-export type SplitResult =
-  | { ok: true; shares: Record<MemberId, Paise> }
-  | { ok: false; error: string; shares: Record<MemberId, Paise> };
+export type SplitResult = { ok: true; shares: Record<MemberId, Paise> } | { ok: false; error: string; shares: Record<MemberId, Paise> };
 
 /** Validate a split spec against a total without computing shares. Returns an error message or null. */
 export function validateSplit(total: Paise, spec: SplitSpec): string | null {
@@ -105,14 +103,20 @@ export function computeSplit(total: Paise, spec: SplitSpec): SplitResult {
   let parts: Paise[];
   switch (mode) {
     case 'equal':
-      parts = allocate(total, participants.map(() => 1));
+      parts = allocate(
+        total,
+        participants.map(() => 1),
+      );
       break;
     case 'exact':
       parts = participants.map((id) => values[id] ?? 0);
       break;
     case 'percent':
     case 'shares':
-      parts = allocate(total, participants.map((id) => values[id] ?? 0));
+      parts = allocate(
+        total,
+        participants.map((id) => values[id] ?? 0),
+      );
       break;
   }
   const shares: Record<MemberId, Paise> = {};
@@ -152,11 +156,7 @@ export interface ItemizedSplitResult {
  *     items cost ₹600 pays ₹60.
  * `memberOrder` fixes the tie-break order for rounding (normally the group's member list).
  */
-export function computeItemizedSplit(
-  items: readonly ReceiptItem[],
-  adjustments: readonly Adjustment[],
-  memberOrder: readonly MemberId[],
-): ItemizedSplitResult {
+export function computeItemizedSplit(items: readonly ReceiptItem[], adjustments: readonly Adjustment[], memberOrder: readonly MemberId[]): ItemizedSplitResult {
   const order = [...memberOrder];
   const rank = new Map(order.map((id, i) => [id, i]));
   // Members referenced by items but missing from the order go last, deterministically.
@@ -172,15 +172,14 @@ export function computeItemizedSplit(
       if (item.totalPaise !== 0) unassigned.push(item);
       continue;
     }
-    allocate(item.totalPaise, assignees.map(() => 1)).forEach((p, i) =>
-      itemsBy.set(assignees[i], (itemsBy.get(assignees[i]) ?? 0) + p),
-    );
+    allocate(
+      item.totalPaise,
+      assignees.map(() => 1),
+    ).forEach((p, i) => itemsBy.set(assignees[i], (itemsBy.get(assignees[i]) ?? 0) + p));
   }
 
   const involved = order.filter((id) => (itemsBy.get(id) ?? 0) !== 0);
-  const byKind = new Map<MemberId, Record<AdjustmentKind, Paise>>(
-    order.map((id) => [id, { tax: 0, service: 0, discount: 0, other: 0 }]),
-  );
+  const byKind = new Map<MemberId, Record<AdjustmentKind, Paise>>(order.map((id) => [id, { tax: 0, service: 0, discount: 0, other: 0 }]));
   let adjustmentsTotal = 0;
   let error: string | undefined;
 
@@ -194,7 +193,12 @@ export function computeItemizedSplit(
     }
     // Weights are item subtotals; clamp at zero in case of negative "items" such as returns.
     const weights = involved.map((id) => Math.max(0, itemsBy.get(id) ?? 0));
-    const parts = weights.every((w) => w === 0) ? allocate(amount, involved.map(() => 1)) : allocate(amount, weights);
+    const parts = weights.every((w) => w === 0)
+      ? allocate(
+          amount,
+          involved.map(() => 1),
+        )
+      : allocate(amount, weights);
     parts.forEach((p, i) => (byKind.get(involved[i])![adj.kind] += p));
   }
 
@@ -223,10 +227,7 @@ export function computeItemizedSplit(
 /** Grand total of an expense in paise. */
 export function expenseTotal(expense: Expense): Paise {
   if (expense.kind === 'manual') return expense.totalPaise;
-  return (
-    expense.items.reduce((s, i) => s + i.totalPaise, 0) +
-    expense.adjustments.reduce((s, a) => s + signedAdjustment(a), 0)
-  );
+  return expense.items.reduce((s, i) => s + i.totalPaise, 0) + expense.adjustments.reduce((s, a) => s + signedAdjustment(a), 0);
 }
 
 /** Per-member shares of any expense. Invalid expenses yield an empty record. */

@@ -126,9 +126,21 @@ function ReceiptImage({ image, activeLine }: { image: ScanImage; activeLine?: nu
         {image.lines.flatMap((l, li) =>
           l.words
             .filter((w) => w.bbox && w.confidence < LOW_CONFIDENCE)
-            .map((w, wi) => <rect key={`${li}-${wi}`} className="ocr-low" x={w.bbox!.x0} y={w.bbox!.y0} width={w.bbox!.x1 - w.bbox!.x0} height={w.bbox!.y1 - w.bbox!.y0} rx={4} />),
+            .map((w, wi) => (
+              <rect
+                key={`${li}-${wi}`}
+                className="ocr-low"
+                x={w.bbox!.x0}
+                y={w.bbox!.y0}
+                width={w.bbox!.x1 - w.bbox!.x0}
+                height={w.bbox!.y1 - w.bbox!.y0}
+                rx={4}
+              />
+            )),
         )}
-        {active && <rect className="ocr-active" x={active.x0 - 6} y={active.y0 - 4} width={active.x1 - active.x0 + 12} height={active.y1 - active.y0 + 8} rx={6} />}
+        {active && (
+          <rect className="ocr-active" x={active.x0 - 6} y={active.y0 - 4} width={active.x1 - active.x0 + 12} height={active.y1 - active.y0 + 8} rx={6} />
+        )}
       </svg>
     </div>
   );

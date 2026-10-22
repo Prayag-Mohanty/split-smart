@@ -80,7 +80,8 @@ const MAX_LINE_AMOUNT = 10_00_000_00; // ₹10 lakh — anything above on a sing
 const NOISE =
   /gstin|gst\s*(no|number|reg|in\b|#)|fssai|\bhsn\b|\bsac\b|\bcin\b|\bpan\b|phone|\bph\b|\bmob|\btel\b|contact|whats?app|invoice|bill\s*(no|#|num)|receipt\s*(no|#)|\bkot\b|token|order\s*(no|id|#|type)|table|\bpax\b|guests?|date|time|cashier|server|steward|waiter|captain|operator|thank|visit|again|www|http|\.com|e-?mail|[\w.]+@[\w-]+\.\w|address|road|\bst\.|street|nagar|pin\s*code|\bpin\b|near\b|opp\b|\btxn|\bref\b|\bcard|\bcash\b|\bupi\b|paytm|gpay|phonepe|change\b|tender|received|balance|total\s*(items?|qty|quantity)|no\.?\s*of\s*items|\bitems?\W*\d+\W*qty|\bitems?\s*:|e\.?\s*&\s*o\.?\s*e|subject\s*to|jurisdiction|powered\s*by|customer|\bname\s*:|\bmode\b|counter/i;
 const SUBTOTAL = /sub\s*-?\s*tot|item\s*tot|food\s*tot|gross\s*(amount|amt|total)|total\s*before|taxable\s*(amount|amt|value)|basic\s*amount/i;
-const TOTAL_STRONG = /grand\s*-?\s*tot|net\s*(amt|amount|payable|total|bill|pay)|amount\s*(payable|due)|total\s*(payable|due)|to\s*pay|payable|bill\s*(amount|amt|total)/i;
+const TOTAL_STRONG =
+  /grand\s*-?\s*tot|net\s*(amt|amount|payable|total|bill|pay)|amount\s*(payable|due)|total\s*(payable|due)|to\s*pay|payable|bill\s*(amount|amt|total)/i;
 const TOTAL_WEAK = /\btot(al)?\b|\btotal|amount\s*$/i;
 const ROUND = /round|r\s*\/\s*off|\brnd\b|\bro\b/i;
 const DISCOUNT = /disc|discount|\bless\b|offer|coupon|promo|saving|cashback|deduction/i;
@@ -188,16 +189,15 @@ function cleanName(tokens: Token[]): string {
     .trim();
 }
 
-const minConf = (tokens: Token[], fallback = 100) =>
-  tokens.length ? Math.round(Math.min(...tokens.map((t) => t.confidence))) : fallback;
+const minConf = (tokens: Token[], fallback = 100) => (tokens.length ? Math.round(Math.min(...tokens.map((t) => t.confidence))) : fallback);
 
 const DATE_RE = /\b(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})\b/;
 
 function detectDate(text: string): string | undefined {
   const m = DATE_RE.exec(text);
   if (!m) return undefined;
-  let [, d, mo, y] = m;
-  if (y.length === 2) y = `20${y}`;
+  const [, d, mo, yy] = m;
+  const y = yy.length === 2 ? `20${yy}` : yy;
   const dd = Number(d);
   const mm = Number(mo);
   if (dd < 1 || dd > 31 || mm < 1 || mm > 12) return undefined;
@@ -214,7 +214,9 @@ export function normaliseLabel(label: string): string {
   return label
     .toLowerCase()
     .split(/\s+/)
-    .map((w) => (/[a-z]/.test(w) && /[0-9]/.test(w) && !/^\d+[.,]?\d*%?$/.test(w) ? w.replace(/6/g, 'g').replace(/5/g, 's').replace(/0/g, 'o').replace(/1/g, 'l') : w))
+    .map((w) =>
+      /[a-z]/.test(w) && /[0-9]/.test(w) && !/^\d+[.,]?\d*%?$/.test(w) ? w.replace(/6/g, 'g').replace(/5/g, 's').replace(/0/g, 'o').replace(/1/g, 'l') : w,
+    )
     .join(' ');
 }
 
@@ -238,7 +240,7 @@ function classify(label: string): { kind: Kind; strength?: number } {
 const isNameNumber = (a: { value: number; isInteger: boolean }) => a.isInteger && a.value > 0;
 
 /** Recover qty / unit / total from the trailing numbers and the label. */
-function itemFromLine(label: Token[], amounts: SplitLine['amounts']): Omit<ParsedItem, 'raw' | 'name' | 'line'> & { nameTokens: Token[] } | null {
+function itemFromLine(label: Token[], amounts: SplitLine['amounts']): (Omit<ParsedItem, 'raw' | 'name' | 'line'> & { nameTokens: Token[] }) | null {
   let nameTokens = [...label];
   const hasQtyColumn = amounts.length >= 2;
   const last = amounts[amounts.length - 1];
@@ -261,7 +263,13 @@ function itemFromLine(label: Token[], amounts: SplitLine['amounts']): Omit<Parse
     } else {
       // Unknown leading numbers: whole numbers may be part of the name ("Chicken 65"),
       // stray prices or zeros are OCR debris and are dropped.
-      nameTokens = [...nameTokens, ...amounts.slice(0, -2).filter(isNameNumber).map((a) => a.token)];
+      nameTokens = [
+        ...nameTokens,
+        ...amounts
+          .slice(0, -2)
+          .filter(isNameNumber)
+          .map((a) => a.token),
+      ];
       amounts = amounts.slice(-2);
     }
   }
@@ -453,7 +461,15 @@ export function parseReceipt(lines: readonly OcrLine[]): ParsedReceipt {
   if (rateOnlyTaxes.length > 0 && taxSummaries.length === 0 && !adjustments.some((a) => a.kind === 'tax')) {
     const base = subtotals.length ? subtotals[subtotals.length - 1].amount : items.reduce((s, i) => s + i.totalPaise, 0);
     for (const t of rateOnlyTaxes) {
-      adjustments.push({ label: `${t.label} (calculated)`, kind: 'tax', amountPaise: Math.round((base * t.rate) / 100), confidence: 0, raw: t.raw, index: t.index, ratePercent: t.rate });
+      adjustments.push({
+        label: `${t.label} (calculated)`,
+        kind: 'tax',
+        amountPaise: Math.round((base * t.rate) / 100),
+        confidence: 0,
+        raw: t.raw,
+        index: t.index,
+        ratePercent: t.rate,
+      });
     }
   }
 

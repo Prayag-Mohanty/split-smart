@@ -25,7 +25,15 @@ export function App() {
       <a className="skip-link" href="#main">
         Skip to content
       </a>
-      <Suspense fallback={<div className="page-loading" aria-busy="true">Loading…</div>}>{renderRoute(route)}</Suspense>
+      <Suspense
+        fallback={
+          <div className="page-loading" aria-busy="true">
+            Loading…
+          </div>
+        }
+      >
+        {renderRoute(route)}
+      </Suspense>
       <Toaster />
     </>
   );

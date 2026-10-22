@@ -36,8 +36,9 @@ function getWorker(): Worker {
   worker.onmessage = (e: MessageEvent<ClassifierResponse>) => {
     const msg = e.data;
     if (msg.type === 'progress') setStatus('loading', msg.progress);
-    else if (msg.type === 'ready') status !== 'ready' && setStatus('ready', 1);
-    else if (msg.type === 'result') {
+    else if (msg.type === 'ready') {
+      if (status !== 'ready') setStatus('ready', 1);
+    } else if (msg.type === 'result') {
       pending.get(msg.id)?.resolve(msg.results.map((r) => r.category));
       pending.delete(msg.id);
     } else if (msg.type === 'error') {

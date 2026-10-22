@@ -100,7 +100,10 @@ export function DebtGraph({ members, before, after, meId }: DebtGraphProps) {
         <strong className={simplified ? 'muted strike' : ''}>
           {before.length} IOU{before.length === 1 ? '' : 's'}
         </strong>{' '}
-        → <strong className={simplified ? 'pos' : 'muted'}>{after.length} payment{after.length === 1 ? '' : 's'}</strong>
+        →{' '}
+        <strong className={simplified ? 'pos' : 'muted'}>
+          {after.length} payment{after.length === 1 ? '' : 's'}
+        </strong>
         <span className="muted small"> — the fewest possible, found exactly.</span>
       </p>
       <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className={`debt-svg${simplified ? ' is-simplified' : ''}`} aria-hidden="true">

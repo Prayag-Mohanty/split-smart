@@ -57,7 +57,12 @@ export function AdjustmentsCard({ draft, update, setActiveLine, setGst, gstBase 
               // Typing an amount by hand makes it a fixed amount (no longer a % of the items).
               onChange={(p) => setAdj(a.id, { amountPaise: a.kind === 'discount' ? -Math.abs(p ?? 0) : (p ?? 0), ratePercent: undefined })}
             />
-            <button type="button" className="icon-btn" aria-label={`Delete ${a.label}`} onClick={() => update((d) => ({ ...d, adjustments: d.adjustments.filter((x) => x.id !== a.id) }))}>
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label={`Delete ${a.label}`}
+              onClick={() => update((d) => ({ ...d, adjustments: d.adjustments.filter((x) => x.id !== a.id) }))}
+            >
               <Icon name="trash" size={18} />
             </button>
             {a.kind !== 'discount' &&
@@ -85,7 +90,11 @@ export function AdjustmentsCard({ draft, update, setActiveLine, setGst, gstBase 
               ) : (
                 a.kind !== 'other' &&
                 base > 0 && (
-                  <button type="button" className="link-btn adj-rate" onClick={() => setAdj(a.id, { ratePercent: Math.round((Math.abs(a.amountPaise) / base) * 10000) / 100 })}>
+                  <button
+                    type="button"
+                    className="link-btn adj-rate"
+                    onClick={() => setAdj(a.id, { ratePercent: Math.round((Math.abs(a.amountPaise) / base) * 10000) / 100 })}
+                  >
                     Keep this as a % of the items instead
                   </button>
                 )
@@ -107,7 +116,14 @@ export function AdjustmentsCard({ draft, update, setActiveLine, setGst, gstBase 
       <div className="row-wrap gst-quick" role="group" aria-label="Set GST">
         <span className="small muted">{hasTax ? 'Replace tax with GST:' : 'Bill had GST? Add CGST + SGST:'}</span>
         {GST_RATES.slice(0, 3).map((r) => (
-          <button key={r} type="button" className="chip-btn" onClick={() => setGst(r)} disabled={gstBase <= 0} title={`CGST ${r / 2}% + SGST ${r / 2}% on ${formatINR(gstBase)}`}>
+          <button
+            key={r}
+            type="button"
+            className="chip-btn"
+            onClick={() => setGst(r)}
+            disabled={gstBase <= 0}
+            title={`CGST ${r / 2}% + SGST ${r / 2}% on ${formatINR(gstBase)}`}
+          >
             {r}%
           </button>
         ))}

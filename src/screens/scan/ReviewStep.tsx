@@ -33,7 +33,12 @@ export function ReviewStep({ draft, update, image, categorizing, canRescan, onRo
   const [activeLine, setActiveLine] = useState<number | undefined>();
 
   const check = useMemo(
-    () => checkTotals(draft.items.map((i) => i.totalPaise), draft.adjustments.map(signedAdjustment), draft.printedTotalPaise),
+    () =>
+      checkTotals(
+        draft.items.map((i) => i.totalPaise),
+        draft.adjustments.map(signedAdjustment),
+        draft.printedTotalPaise,
+      ),
     [draft.items, draft.adjustments, draft.printedTotalPaise],
   );
   const lowCount = draft.items.filter((i) => i.low).length + draft.adjustments.filter((a) => a.low !== undefined).length + (draft.totalLow ? 1 : 0);
@@ -54,7 +59,11 @@ export function ReviewStep({ draft, update, image, categorizing, canRescan, onRo
       ...d,
       adjustments: [
         ...d.adjustments,
-        newAdjustment('other', Math.abs(check.differencePaise) < 100 ? 'Round off' : check.differencePaise > 0 ? 'Unmatched charges' : 'Unmatched reduction', check.differencePaise),
+        newAdjustment(
+          'other',
+          Math.abs(check.differencePaise) < 100 ? 'Round off' : check.differencePaise > 0 ? 'Unmatched charges' : 'Unmatched reduction',
+          check.differencePaise,
+        ),
       ],
     }));
 
@@ -63,7 +72,10 @@ export function ReviewStep({ draft, update, image, categorizing, canRescan, onRo
   const setGst = (rate: number) =>
     update((d) => ({
       ...d,
-      adjustments: [...d.adjustments.filter((a) => a.kind !== 'tax'), ...gstLines(gstBase, rate).map((l) => newAdjustment('tax', l.label, l.amountPaise, l.ratePercent))],
+      adjustments: [
+        ...d.adjustments.filter((a) => a.kind !== 'tax'),
+        ...gstLines(gstBase, rate).map((l) => newAdjustment('tax', l.label, l.amountPaise, l.ratePercent)),
+      ],
     }));
   // If the printed total minus everything except tax looks like a GST slab, offer it.
   const taxPaise = draft.adjustments.filter((a) => a.kind === 'tax').reduce((sum, a) => sum + a.amountPaise, 0);
@@ -80,17 +92,20 @@ export function ReviewStep({ draft, update, image, categorizing, canRescan, onRo
       <section className="review-data stack" aria-label="Parsed receipt">
         {image && noItems && (
           <Banner tone="warn">
-            <strong>No items found on this image.</strong> It may not be a receipt, or the photo is blurry or sideways. Try rotating or retaking it, or add the items by hand below.
+            <strong>No items found on this image.</strong> It may not be a receipt, or the photo is blurry or sideways. Try rotating or retaking it, or add the
+            items by hand below.
           </Banner>
         )}
         {poorScan && !noItems && (
           <Banner tone="warn">
-            This scan looks rough (average confidence {Math.round(image!.meanConfidence)}%). If the receipt is sideways, rotate it to re-scan — or just fix the highlighted fields.
+            This scan looks rough (average confidence {Math.round(image!.meanConfidence)}%). If the receipt is sideways, rotate it to re-scan — or just fix the
+            highlighted fields.
           </Banner>
         )}
         {lowCount > 0 && (
           <Banner tone="info">
-            {lowCount} field{lowCount > 1 ? 's' : ''} highlighted in yellow {lowCount > 1 ? 'were' : 'was'} hard to read. Please double-check {lowCount > 1 ? 'them' : 'it'}.
+            {lowCount} field{lowCount > 1 ? 's' : ''} highlighted in yellow {lowCount > 1 ? 'were' : 'was'} hard to read. Please double-check{' '}
+            {lowCount > 1 ? 'them' : 'it'}.
             <ul className="conf-help">
               <li>
                 <strong>What the ? means:</strong> the scanner wasn't sure it read that field correctly. It's only a reminder — it never blocks you.
@@ -114,7 +129,13 @@ export function ReviewStep({ draft, update, image, categorizing, canRescan, onRo
           <div className="grid-2">
             <label className="field">
               <span>Description</span>
-              <input className="input" value={draft.description} onChange={(e) => update((d) => ({ ...d, description: e.target.value }))} placeholder="e.g. Night canteen" maxLength={80} />
+              <input
+                className="input"
+                value={draft.description}
+                onChange={(e) => update((d) => ({ ...d, description: e.target.value }))}
+                placeholder="e.g. Night canteen"
+                maxLength={80}
+              />
             </label>
             <label className="field">
               <span>Date</span>

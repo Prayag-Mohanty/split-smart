@@ -53,8 +53,8 @@ export function drawRotated(bitmap: ImageBitmap, rotation: Rotation): HTMLCanvas
   ctx.imageSmoothingQuality = 'high';
   ctx.translate(w / 2, h / 2);
   ctx.rotate((rotation * Math.PI) / 180);
-  const dw = (swap ? h : w);
-  const dh = (swap ? w : h);
+  const dw = swap ? h : w;
+  const dh = swap ? w : h;
   ctx.drawImage(bitmap, -dw / 2, -dh / 2, dw, dh);
   return canvas;
 }
@@ -106,7 +106,5 @@ export function enhanceForOcr(canvas: HTMLCanvasElement): HTMLCanvasElement {
 }
 
 export function canvasToBlob(canvas: HTMLCanvasElement, type = 'image/jpeg', quality = 0.85): Promise<Blob> {
-  return new Promise((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not encode image'))), type, quality),
-  );
+  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not encode image'))), type, quality));
 }

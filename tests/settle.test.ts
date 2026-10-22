@@ -23,7 +23,10 @@ function bruteMin(values: number[]): number {
       if (!(mask & 1)) continue; // subset containing the first element
       let s = 0;
       const rest: number[] = [];
-      for (let i = 0; i < n; i++) (mask >> i) & 1 ? (s += vals[i]) : rest.push(vals[i]);
+      for (let i = 0; i < n; i++) {
+        if ((mask >> i) & 1) s += vals[i];
+        else rest.push(vals[i]);
+      }
       if (s === 0) res = Math.max(res, 1 + best(rest));
     }
     return res;
@@ -49,7 +52,7 @@ describe('simplifyDebts', () => {
 
   it('matches brute force on random cases and always settles everyone', () => {
     let seed = 42;
-    const rand = () => ((seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31);
+    const rand = () => (seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
     for (let trial = 0; trial < 150; trial++) {
       const n = 2 + Math.floor(rand() * 7);
       const vals = Array.from({ length: n - 1 }, () => Math.floor(rand() * 9 - 4) * 100);

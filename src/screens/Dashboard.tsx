@@ -204,7 +204,10 @@ function CreateGroupModal({ open, onClose }: { open: boolean; onClose: () => voi
   const inputRef = useRef<HTMLInputElement>(null);
 
   const addDraft = () => {
-    const names = draft.split(',').map((n) => n.trim()).filter(Boolean);
+    const names = draft
+      .split(',')
+      .map((n) => n.trim())
+      .filter(Boolean);
     if (names.length) setMembers((m) => [...m, ...names.filter((n) => !m.includes(n))]);
     setDraft('');
     inputRef.current?.focus();
@@ -212,7 +215,13 @@ function CreateGroupModal({ open, onClose }: { open: boolean; onClose: () => voi
 
   const submit = () => {
     if (!name.trim()) return;
-    const all = [...members, ...draft.split(',').map((n) => n.trim()).filter(Boolean)];
+    const all = [
+      ...members,
+      ...draft
+        .split(',')
+        .map((n) => n.trim())
+        .filter(Boolean),
+    ];
     const id = createGroup(name, all, emoji, myName);
     setName('');
     setMembers([]);
@@ -247,7 +256,15 @@ function CreateGroupModal({ open, onClose }: { open: boolean; onClose: () => voi
       >
         <label className="field">
           <span>Group name</span>
-          <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Night Canteen Gang" autoFocus required maxLength={60} />
+          <input
+            className="input"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Night Canteen Gang"
+            autoFocus
+            required
+            maxLength={60}
+          />
         </label>
         <fieldset className="field">
           <legend>Icon</legend>
@@ -261,7 +278,14 @@ function CreateGroupModal({ open, onClose }: { open: boolean; onClose: () => voi
         </fieldset>
         <label className="field">
           <span>Your name</span>
-          <input className="input" value={myName} onChange={(e) => setMyName(e.target.value)} placeholder="e.g. Riya" maxLength={40} autoComplete="given-name" />
+          <input
+            className="input"
+            value={myName}
+            onChange={(e) => setMyName(e.target.value)}
+            placeholder="e.g. Riya"
+            maxLength={40}
+            autoComplete="given-name"
+          />
           <small className="muted">You'll show up as “You” in this group. Remembered for next time.</small>
         </label>
         <div className="field">

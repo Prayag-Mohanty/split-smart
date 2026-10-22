@@ -1,0 +1,7 @@
+dist
+dev-dist
+public/ocr
+node_modules
+package-lock.json
+samples
+docs

@@ -56,9 +56,7 @@ const updateGroup = (groups: Group[], id: string, fn: (g: Group) => Group) => gr
 export function memberInUse(group: Group, memberId: string): boolean {
   return (
     group.expenses.some(
-      (e) =>
-        e.payerId === memberId ||
-        (e.kind === 'manual' ? e.split.participants.includes(memberId) : e.items.some((i) => i.assignees.includes(memberId))),
+      (e) => e.payerId === memberId || (e.kind === 'manual' ? e.split.participants.includes(memberId) : e.items.some((i) => i.assignees.includes(memberId))),
     ) ||
     group.settlements.some((s) => s.fromId === memberId || s.toId === memberId) ||
     group.recurring.some((r) => r.payerId === memberId || r.split.participants.includes(memberId))
@@ -83,15 +81,11 @@ export const useStore = create<State>()(
         const meId = me ? members[0].id : undefined;
         if (me) set((s) => ({ settings: { ...s.settings, myName: me } }));
         set((s) => ({
-          groups: [
-            { id, name: name.trim(), emoji, createdAt: Date.now(), members, expenses: [], settlements: [], recurring: [], meId },
-            ...s.groups,
-          ],
+          groups: [{ id, name: name.trim(), emoji, createdAt: Date.now(), members, expenses: [], settlements: [], recurring: [], meId }, ...s.groups],
         }));
         return id;
       },
-      renameGroup: (groupId, name, emoji) =>
-        set((s) => ({ groups: updateGroup(s.groups, groupId, (g) => ({ ...g, name: name.trim() || g.name, emoji })) })),
+      renameGroup: (groupId, name, emoji) => set((s) => ({ groups: updateGroup(s.groups, groupId, (g) => ({ ...g, name: name.trim() || g.name, emoji })) })),
       deleteGroup: (groupId) => set((s) => ({ groups: s.groups.filter((g) => g.id !== groupId) })),
       setSimplifyDebts: (groupId, on) => set((s) => ({ groups: updateGroup(s.groups, groupId, (g) => ({ ...g, simplifyDebts: on })) })),
       setDefaultSplit: (groupId, value) =>
@@ -109,7 +103,9 @@ export const useStore = create<State>()(
         const myName = get().settings.myName?.toLowerCase();
         const meId = opts?.keepMe
           ? group.meId
-          : group.meId && group.members.some((m) => m.id === group.meId && m.name.toLowerCase() === myName) ? group.meId : group.members.find((m) => m.name.toLowerCase() === myName)?.id;
+          : group.meId && group.members.some((m) => m.id === group.meId && m.name.toLowerCase() === myName)
+            ? group.meId
+            : group.members.find((m) => m.name.toLowerCase() === myName)?.id;
         set((s) => ({ groups: [{ ...group, id, createdAt: Date.now(), meId }, ...s.groups] }));
         return id;
       },
@@ -133,9 +129,7 @@ export const useStore = create<State>()(
         })),
       removeMember: (groupId, memberId) =>
         set((s) => ({
-          groups: updateGroup(s.groups, groupId, (g) =>
-            memberInUse(g, memberId) ? g : { ...g, members: g.members.filter((m) => m.id !== memberId) },
-          ),
+          groups: updateGroup(s.groups, groupId, (g) => (memberInUse(g, memberId) ? g : { ...g, members: g.members.filter((m) => m.id !== memberId) })),
         })),
 
       saveExpense: (groupId, expense) =>

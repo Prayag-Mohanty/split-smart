@@ -71,13 +71,17 @@ const grocery = [
     await el.screenshot({ path: path.join(__dirname, '..', 'samples', s.file) });
   }
   // Rotated 90° version of the clear bill.
-  await page.setContent(`<html><body style="margin:0;display:inline-block"><img id=i src="data:image/png;base64,${require('fs')
-    .readFileSync(path.join(__dirname, '..', 'samples', 'restaurant-clear.png'))
-    .toString('base64')}" style="display:block"></body></html>`);
+  await page.setContent(
+    `<html><body style="margin:0;display:inline-block"><img id=i src="data:image/png;base64,${require('fs')
+      .readFileSync(path.join(__dirname, '..', 'samples', 'restaurant-clear.png'))
+      .toString('base64')}" style="display:block"></body></html>`,
+  );
   const dims = await page.$eval('#i', (i) => [i.naturalWidth, i.naturalHeight]);
   await page.setContent(`<html><body style="margin:0"><canvas id=c width=${dims[1]} height=${dims[0]}></canvas><script>
     const img=new Image();img.onload=()=>{const c=document.getElementById('c').getContext('2d');c.translate(${dims[1]},0);c.rotate(Math.PI/2);c.drawImage(img,0,0);document.title='ok'};
-    img.src="data:image/png;base64,${require('fs').readFileSync(path.join(__dirname, '..', 'samples', 'restaurant-clear.png')).toString('base64')}";</script></body></html>`);
+    img.src="data:image/png;base64,${require('fs')
+      .readFileSync(path.join(__dirname, '..', 'samples', 'restaurant-clear.png'))
+      .toString('base64')}";</script></body></html>`);
   await page.waitForFunction(() => document.title === 'ok');
   const data = await page.$eval('#c', (c) => c.toDataURL('image/png').split(',')[1]);
   require('fs').writeFileSync(path.join(__dirname, '..', 'samples', 'restaurant-rotated.png'), Buffer.from(data, 'base64'));
